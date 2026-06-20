@@ -42,6 +42,9 @@ public class ExamStatistics {
         private Integer sequence;
         private double averageScore;
         private double correctRate;
-        private Map<String, Integer> optionDistribution; // For SINGLE/MULTI/JUDGE: "A": 10, "B": 2
+        private Map<String, Integer> optionDistribution;
+        private Integer presetDifficulty;
+        private Double perceivedDifficultyAverage;
+        private Long perceivedDifficultyCount;
     }
 }

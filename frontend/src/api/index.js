@@ -163,4 +163,10 @@ export const heartbeat = (examId) => api.post(`/exams/${examId}/heartbeat`);
 export const getProctorData = (examId) => api.get(`/proctor/${examId}`);
 export const exportProctorSnapshot = (examId) => api.get(`/proctor/${examId}/export`, { responseType: 'blob' });
 
+// Question Ratings
+export const submitQuestionRating = (data) => api.post('/question-ratings', data);
+export const getMyQuestionRatings = () => api.get('/question-ratings/my');
+export const getMyRatingForQuestion = (questionId) => api.get(`/question-ratings/question/${questionId}/my`);
+export const getQuestionRatingAverage = (questionId) => api.get(`/question-ratings/question/${questionId}/average`);
+
 export default api;

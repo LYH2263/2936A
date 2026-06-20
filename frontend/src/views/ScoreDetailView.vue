@@ -2,12 +2,13 @@
 import { ref, onMounted, computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useAuthStore } from '@/stores/auth';
-import { getSubmission, getExamQuestions, submitAppeal, getMyAppeals, submitFeedback, getMyFeedbacks } from '@/api';
+import { getSubmission, getExamQuestions, submitAppeal, getMyAppeals, submitFeedback, getMyFeedbacks, submitQuestionRating, getMyQuestionRatings } from '@/api';
 import { message } from 'ant-design-vue';
 import { 
   LeftOutlined, CheckCircleFilled, CloseCircleFilled, 
   InfoCircleOutlined, TrophyOutlined, ClockCircleOutlined,
-  CalendarOutlined, UserOutlined, AlertOutlined, FlagOutlined
+  CalendarOutlined, UserOutlined, AlertOutlined, FlagOutlined,
+  StarOutlined, StarFilled
 } from '@ant-design/icons-vue';
 
 const route = useRoute();
@@ -33,6 +34,10 @@ const feedbackType = ref('ANSWER_ERROR');
 const feedbackDescription = ref('');
 const submittingFeedback = ref(false);
 
+const existingRatings = ref([]);
+const ratingHoverValue = ref({});
+const submittingRating = ref({});
+
 const feedbackTypeOptions = [
   { value: 'ANSWER_ERROR', label: '答案错误' },
   { value: 'QUESTION_UNCLEAR', label: '题干不清' },
@@ -56,6 +61,10 @@ const fetchData = async () => {
       try {
         const fbRes = await getMyFeedbacks();
         existingFeedbacks.value = fbRes.data;
+      } catch (e) { /* ignore */ }
+      try {
+        const rtRes = await getMyQuestionRatings();
+        existingRatings.value = rtRes.data;
       } catch (e) { /* ignore */ }
     }
   } catch (e) {
@@ -199,6 +208,40 @@ const handleFeedbackSubmit = async () => {
   }
 };
 
+const getMyRating = (qId) => {
+  const rating = existingRatings.value.find(r => r.question?.id === qId || r.question === qId);
+  return rating ? rating.rating : 0;
+};
+
+const handleRatingClick = async (qId, value) => {
+  submittingRating.value[qId] = true;
+  try {
+    await submitQuestionRating({
+      questionId: qId,
+      rating: value
+    });
+    message.success('评分已保存');
+    fetchData();
+  } catch (e) {
+    const msg = e.response?.data?.message || '评分失败';
+    message.error(msg);
+  } finally {
+    submittingRating.value[qId] = false;
+  }
+};
+
+const handleRatingHover = (qId, value) => {
+  ratingHoverValue.value[qId] = value;
+};
+
+const handleRatingLeave = (qId) => {
+  ratingHoverValue.value[qId] = 0;
+};
+
+const showViewAnalysis = computed(() => {
+  return submission.value?.exam?.allowViewAnalysis === true;
+});
+
 onMounted(fetchData);
 </script>
 
@@ -330,6 +373,32 @@ onMounted(fetchData);
                <div class="explanation">
                   <div class="exp-label">解析:</div>
                   <div class="exp-content">{{ q.question.analysis || '暂无解析' }}</div>
+               </div>
+
+               <div v-if="showViewAnalysis && authStore.user?.role === 'STUDENT'" class="rating-section">
+                  <div class="rating-label">你觉得难度如何？</div>
+                  <div class="rating-stars" :class="{ 'rating-loading': submittingRating[q.question.id] }">
+                     <template v-for="star in 5" :key="star">
+                        <span 
+                           class="star-icon"
+                           @mouseenter="handleRatingHover(q.question.id, star)"
+                           @mouseleave="handleRatingLeave(q.question.id)"
+                           @click="!submittingRating[q.question.id] && handleRatingClick(q.question.id, star)"
+                        >
+                           <StarFilled 
+                              v-if="(ratingHoverValue[q.question.id] || getMyRating(q.question.id)) >= star" 
+                              class="star-filled"
+                           />
+                           <StarOutlined 
+                              v-else 
+                              class="star-outline"
+                           />
+                        </span>
+                     </template>
+                     <span v-if="getMyRating(q.question.id) > 0" class="rating-text">
+                        已评 {{ getMyRating(q.question.id) }} 星（可修改）
+                     </span>
+                  </div>
                </div>
             </div>
          </div>
@@ -637,6 +706,50 @@ onMounted(fetchData);
 }
 .exp-label { font-weight: 600; color: #555; margin-bottom: 6px; }
 .exp-content { color: #666; line-height: 1.6; }
+
+.rating-section {
+  margin-top: 20px;
+  padding: 16px 20px;
+  background: linear-gradient(135deg, #fff7e6 0%, #ffe7ba 100%);
+  border-radius: 10px;
+  border: 1px dashed #ffd591;
+}
+.rating-label {
+  font-weight: 600;
+  color: #d46b08;
+  margin-bottom: 10px;
+  font-size: 14px;
+}
+.rating-stars {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.rating-stars.rating-loading {
+  opacity: 0.5;
+  pointer-events: none;
+}
+.star-icon {
+  cursor: pointer;
+  transition: transform 0.15s ease;
+  display: inline-flex;
+}
+.star-icon:hover {
+  transform: scale(1.2);
+}
+.star-filled {
+  color: #faad14;
+  font-size: 26px;
+}
+.star-outline {
+  color: #d9d9d9;
+  font-size: 26px;
+}
+.rating-text {
+  margin-left: 12px;
+  font-size: 13px;
+  color: #8c8c8c;
+}
 
 .paper-footer {
   margin-top: 80px;

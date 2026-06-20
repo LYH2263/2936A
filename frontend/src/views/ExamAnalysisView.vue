@@ -106,8 +106,6 @@ const initOverviewCharts = () => {
 const initQuestionCharts = () => {
     if (!difficultyChartRef.value || !stats.value) return;
     if (difficultyChartInstance) difficultyChartInstance.dispose();
-    difficultyChartInstance = echarts.init(difficultyChartRef.value);
-    
     const data = stats.value.questionAnalysis || [];
     difficultyChartInstance.setOption({
       title: { text: '题目正确率趋势', left: 'center' },
@@ -128,6 +126,68 @@ const initQuestionCharts = () => {
         },
         itemStyle: { color: '#722ed1' }
       }]
+    });
+};
+
+const difficultyCompareChartRef = ref(null);
+let difficultyCompareChartInstance = null;
+
+const initDifficultyCompareChart = () => {
+    if (!difficultyCompareChartRef.value || !stats.value) return;
+    if (difficultyCompareChartInstance) difficultyCompareChartInstance.dispose();
+    difficultyCompareChartInstance = echarts.init(difficultyCompareChartRef.value);
+
+    const data = stats.value.questionAnalysis || [];
+    const xData = data.map(q => `Q${q.sequence}`);
+    const presetData = data.map(q => q.presetDifficulty || 0);
+    const perceivedData = data.map(q => {
+        if (q.perceivedDifficultyCount >= 10) {
+            return q.perceivedDifficultyAverage || 0;
+        }
+        return null;
+    });
+
+    difficultyCompareChartInstance.setOption({
+      title: { text: '题库预设难度 vs 学生体感难度', left: 'center' },
+      tooltip: {
+        trigger: 'axis',
+        formatter: (params) => {
+            let result = params[0].axisValue + '<br/>';
+            params.forEach(p => {
+                const q = data[p.dataIndex];
+                if (p.seriesName === '学生体感难度') {
+                    if (q.perceivedDifficultyCount < 10) {
+                        result += `${p.marker} ${p.seriesName}: 样本不足 (${q.perceivedDifficultyCount}人评)<br/>`;
+                    } else {
+                        result += `${p.marker} ${p.seriesName}: ${p.value.toFixed(2)} (${q.perceivedDifficultyCount}人评)<br/>`;
+                    }
+                } else {
+                        result += `${p.marker} ${p.seriesName}: ${p.value || '未设置'}<br/>`;
+                    }
+            });
+            return result;
+        }
+      },
+      legend: { data: ['题库预设难度', '学生体感难度'], bottom: 0 },
+      grid: { left: '3%', right: '4%', bottom: '15%', containLabel: true },
+      xAxis: { type: 'category', data: xData, name: '题号' },
+      yAxis: { type: 'value', name: '难度星级', min: 0, max: 5, interval: 1 },
+      series: [
+        {
+          name: '题库预设难度',
+          type: 'bar',
+          data: presetData,
+          itemStyle: { color: '#1890ff' },
+          barWidth: '30%'
+        },
+        {
+          name: '学生体感难度',
+          type: 'bar',
+          data: perceivedData,
+          itemStyle: { color: '#faad14' },
+          barWidth: '30%'
+        }
+      ]
     });
 };
 
@@ -181,12 +241,17 @@ const questionColumns = [
   { title: '类型', dataIndex: 'type', key: 'type', width: 100 },
   { title: '分值', dataIndex: 'score', key: 'score', width: 80 },
   { title: '平均分', dataIndex: 'averageScore', key: 'averageScore', customRender: ({text}) => text.toFixed(1) },
-  { title: '正确率', dataIndex: 'correctRate', key: 'correctRate', width: 200 }
+  { title: '正确率', dataIndex: 'correctRate', key: 'correctRate', width: 200 },
+  { title: '预设难度', dataIndex: 'presetDifficulty', key: 'presetDifficulty', width: 120 },
+  { title: '学生体感难度', dataIndex: 'perceivedDifficulty', key: 'perceivedDifficulty', width: 220 }
 ];
 
 const handleTabChange = (key) => {
     if (key === 'overall') nextTick(() => initOverviewCharts());
-    if (key === 'questions') nextTick(() => initQuestionCharts());
+    if (key === 'questions') nextTick(() => {
+        initQuestionCharts();
+        initDifficultyCompareChart();
+    });
 }
 </script>
 
@@ -290,6 +355,9 @@ const handleTabChange = (key) => {
                  <div class="chart-container shadow mb-24">
                     <div ref="difficultyChartRef" style="height: 300px;"></div>
                  </div>
+                 <div class="chart-container shadow mb-24">
+                    <div ref="difficultyCompareChartRef" style="height: 380px;"></div>
+                 </div>
                  <a-table 
                     :dataSource="stats.questionAnalysis" 
                     :columns="questionColumns" 
@@ -315,6 +383,21 @@ const handleTabChange = (key) => {
                       </template>
                       <template v-if="column.key === 'content'">
                          <div v-html="record.content"></div>
+                      </template>
+                      <template v-if="column.key === 'presetDifficulty'">
+                         <a-rate v-model:value="record.presetDifficulty" disabled allow-half />
+                         <span class="difficulty-num">{{ record.presetDifficulty || 0 }}</span>
+                      </template>
+                      <template v-if="column.key === 'perceivedDifficulty'">
+                         <template v-if="record.perceivedDifficultyCount >= 10">
+                            <a-rate v-model:value="record.perceivedDifficultyAverage" disabled allow-half />
+                            <span class="difficulty-num">{{ record.perceivedDifficultyAverage?.toFixed(1) || '0.0' }}</span>
+                            <span class="rating-count"> ({{ record.perceivedDifficultyCount }}人评)</span>
+                         </template>
+                         <template v-else>
+                            <a-tag color="default">样本不足</a-tag>
+                            <span class="rating-count"> ({{ record.perceivedDifficultyCount || 0 }}人评)</span>
+                         </template>
                       </template>
                     </template>
                   </a-table>
@@ -508,6 +591,18 @@ const handleTabChange = (key) => {
     background: #fff7e6;
     color: #faad14;
     border: 1px solid #ffe58f;
+}
+
+.difficulty-num {
+    margin-left: 8px;
+    font-weight: 600;
+    color: #595959;
+    font-size: 14px;
+}
+.rating-count {
+    margin-left: 6px;
+    color: #8c8c8c;
+    font-size: 12px;
 }
 
 @media print {

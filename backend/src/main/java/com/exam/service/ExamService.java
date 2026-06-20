@@ -30,15 +30,17 @@ public class ExamService {
     private final UserRepository userRepository;
     private final com.exam.repository.SubmissionRepository submissionRepository;
     private final com.exam.repository.SubmissionAnswerRepository submissionAnswerRepository;
+    private final com.exam.repository.QuestionRatingRepository questionRatingRepository;
     private final NotificationService notificationService;
 
-    public ExamService(ExamRepository examRepository, QuestionRepository questionRepository, ExamQuestionRepository examQuestionRepository, UserRepository userRepository, com.exam.repository.SubmissionRepository submissionRepository, com.exam.repository.SubmissionAnswerRepository submissionAnswerRepository, NotificationService notificationService) {
+    public ExamService(ExamRepository examRepository, QuestionRepository questionRepository, ExamQuestionRepository examQuestionRepository, UserRepository userRepository, com.exam.repository.SubmissionRepository submissionRepository, com.exam.repository.SubmissionAnswerRepository submissionAnswerRepository, com.exam.repository.QuestionRatingRepository questionRatingRepository, NotificationService notificationService) {
         this.examRepository = examRepository;
         this.questionRepository = questionRepository;
         this.examQuestionRepository = examQuestionRepository;
         this.userRepository = userRepository;
         this.submissionRepository = submissionRepository;
         this.submissionAnswerRepository = submissionAnswerRepository;
+        this.questionRatingRepository = questionRatingRepository;
         this.notificationService = notificationService;
     }
 
@@ -294,6 +296,14 @@ public class ExamService {
                         res -> res
                 ));
 
+        List<Long> questionIds = examQuestions.stream().map(eq -> eq.getQuestion().getId()).collect(java.util.stream.Collectors.toList());
+        List<Object[]> ratingResults = questionRatingRepository.findAverageAndCountByQuestionIds(questionIds);
+        java.util.Map<Long, Object[]> ratingMap = ratingResults.stream()
+                .collect(java.util.stream.Collectors.toMap(
+                        res -> (Long) res[0],
+                        res -> res
+                ));
+
         for (ExamQuestion eq : examQuestions) {
             Question q = eq.getQuestion();
             com.exam.dto.ExamStatistics.QuestionStat qs = new com.exam.dto.ExamStatistics.QuestionStat();
@@ -301,7 +311,8 @@ public class ExamService {
             qs.setContent(q.getContent());
             qs.setType(q.getType());
             qs.setSequence(eq.getSequence());
-            
+            qs.setPresetDifficulty(q.getDifficulty());
+
             Object[] analysis = analysisMap.get(q.getId());
             if (analysis != null) {
                 qs.setAverageScore((Double) analysis[1]);
@@ -309,6 +320,15 @@ public class ExamService {
             } else {
                 qs.setAverageScore(0.0);
                 qs.setCorrectRate(0.0);
+            }
+
+            Object[] rating = ratingMap.get(q.getId());
+            if (rating != null) {
+                qs.setPerceivedDifficultyAverage((Double) rating[1]);
+                qs.setPerceivedDifficultyCount((Long) rating[2]);
+            } else {
+                qs.setPerceivedDifficultyAverage(0.0);
+                qs.setPerceivedDifficultyCount(0L);
             }
             qStats.add(qs);
         }
