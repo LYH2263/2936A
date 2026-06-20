@@ -39,7 +39,7 @@ public class AppealService {
                 .orElseThrow(() -> new RuntimeException("提交记录不存在"));
 
         if (!submission.getStudent().getId().equals(student.getId())) {
-            throw new RuntimeException("无权对该提交发起申诉"));
+            throw new RuntimeException("无权对该提交发起申诉");
         }
 
         if (!"SUBMITTED".equals(submission.getState())) {
