@@ -147,4 +147,14 @@ export const deleteCommentTemplate = (id) => api.delete(`/comment-templates/${id
 
 export const getMyBadges = () => api.get('/badges/my');
 
+// Flash Practice
+export const getFlashSubjects = () => api.get('/flash-practice/subjects');
+export const getFlashKnowledgePoints = (subject) => api.get('/flash-practice/knowledge-points', { params: subject ? { subject } : {} });
+export const getFlashTodayStats = () => api.get('/flash-practice/today-stats');
+export const startFlashSession = (data) => api.post('/flash-practice/start', data);
+export const getFlashNextQuestion = (sessionId) => api.get(`/flash-practice/${sessionId}/next-question`);
+export const submitFlashAnswer = (sessionId, data) => api.post(`/flash-practice/${sessionId}/submit`, data);
+export const endFlashSession = (sessionId) => api.post(`/flash-practice/${sessionId}/end`);
+export const getFlashSession = (sessionId) => api.get(`/flash-practice/${sessionId}`);
+
 export default api;

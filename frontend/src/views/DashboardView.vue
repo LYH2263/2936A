@@ -3,15 +3,14 @@ import { ref, computed, onMounted, watch, h, shallowRef } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { useAuthStore } from '@/stores/auth';
 import { useConfigStore } from '@/stores/config';
-import { getExams, getMySubmissions, publishExam, deleteExam, getExamSubmissions, updateProfile, getSystemConfig, getStudentStats, getTeacherStats, getPendingAppealCount, getPendingFeedbackCount, checkCertEligibility, downloadCertificate, getStudyPlanDashboard, getCommentTemplates, createCommentTemplate, updateCommentTemplate, deleteCommentTemplate, getMyBadges } from '@/api';
-import { message } from 'ant-design-vue';
+import { getExams, getMySubmissions, publishExam, deleteExam, getExamSubmissions, updateProfile, getSystemConfig, getStudentStats, getTeacherStats, getPendingAppealCount, getPendingFeedbackCount, checkCertEligibility, downloadCertificate, getStudyPlanDashboard, getCommentTemplates, createCommentTemplate, updateCommentTemplate, deleteCommentTemplate, getMyBadges, getFlashTodayStats } from '@/api';
 import { 
   UserOutlined, LogoutOutlined, PlusOutlined, UnorderedListOutlined, 
   BankOutlined, ProfileOutlined, BookOutlined, TeamOutlined, FileTextOutlined,
   SettingOutlined, DashboardOutlined, TrophyOutlined, HourglassOutlined, ReadOutlined,
   SearchOutlined, BarsOutlined, AlertOutlined, SafetyCertificateOutlined, DownloadOutlined,
   FlagOutlined, FireOutlined, FormOutlined, EditOutlined, DeleteOutlined, GlobalOutlined,
-  AppstoreOutlined, ClockCircleOutlined, SecurityScanOutlined
+  AppstoreOutlined, ClockCircleOutlined, SecurityScanOutlined, ThunderboltOutlined
 } from '@ant-design/icons-vue';
 import CreateExamModal from '@/components/CreateExamModal.vue';
 import AddQuestionModal from '@/components/AddQuestionModal.vue';
@@ -68,6 +67,8 @@ const studyPlanExamTitle = ref('');
 
 const badges = ref([]);
 const badgesLoading = ref(false);
+
+const flashTodayStats = ref({ totalQuestions: 0, correctCount: 0, accuracy: 0 });
 
 const fetchBadges = async () => {
   if (authStore.user?.role !== 'STUDENT') return;
@@ -172,6 +173,10 @@ const fetchData = async () => {
         const spRes = await getStudyPlanDashboard();
         studyPlanCards.value = spRes.data || [];
       } catch (e) { /* ignore */ }
+      try {
+        const flashRes = await getFlashTodayStats();
+        flashTodayStats.value = flashRes.data || { totalQuestions: 0, correctCount: 0, accuracy: 0 };
+      } catch (e) { /* ignore */ }
     } else if (authStore.isTeacher) {
       const tStatsRes = await getTeacherStats();
       teacherStats.value = tStatsRes.data;
@@ -212,6 +217,10 @@ const handleMenuClick = ({ key }) => {
   }
   if (key === 'feedback-review') {
     router.push('/feedbacks/teacher');
+    return;
+  }
+  if (key === 'flash-practice') {
+    router.push('/flash-practice');
     return;
   }
   if (key === 'comment-templates') {
@@ -537,6 +546,10 @@ const refreshStudyPlans = async () => {
           <BookOutlined />
           <span>考试大厅</span>
         </a-menu-item>
+        <a-menu-item key="flash-practice" v-if="authStore.user?.role === 'STUDENT'">
+          <ThunderboltOutlined />
+          <span>闪练</span>
+        </a-menu-item>
         <a-menu-item key="scores" v-if="authStore.user?.role === 'STUDENT'">
           <TrophyOutlined />
           <span>我的成绩</span>
@@ -589,7 +602,8 @@ const refreshStudyPlans = async () => {
               'comment-templates': '评语模板',
               'users': '用户管理', 
               'config': '系统设置', 
-              'profile': '个人资料' 
+              'profile': '个人资料',
+              'flash-practice': '闪练'
             }[activeTab] }}
           </span>
         </div>
@@ -637,6 +651,49 @@ const refreshStudyPlans = async () => {
                 </a-col>
               </a-row>
             </a-skeleton>
+
+            <div class="flash-practice-entry-section" style="margin-top: 24px;">
+              <a-card 
+                hoverable 
+                class="flash-entry-card"
+                @click="router.push('/flash-practice')"
+                :body-style="{ padding: 0 }"
+              >
+                <div class="flash-entry-body">
+                  <div class="flash-entry-left">
+                    <div class="flash-entry-icon-wrap">
+                      <ThunderboltOutlined class="flash-entry-icon" />
+                    </div>
+                    <div class="flash-entry-info">
+                      <div class="flash-entry-title">⚡ 轻量速练 · 闪练</div>
+                      <div class="flash-entry-desc">按科目/难度/知识点随机抽题，即答即看解析，无需创建完整考试</div>
+                      <div class="flash-entry-tags">
+                        <a-tag color="orange">随机抽题</a-tag>
+                        <a-tag color="blue">即时判分</a-tag>
+                        <a-tag color="purple">查看解析</a-tag>
+                        <a-tag color="green">连对激励</a-tag>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="flash-entry-right">
+                    <div class="flash-entry-stats">
+                      <div class="flash-stat-item">
+                        <div class="flash-stat-value">{{ flashTodayStats.totalQuestions }}</div>
+                        <div class="flash-stat-label">今日已练</div>
+                      </div>
+                      <a-divider type="vertical" style="height: 40px; margin: 0 16px;" />
+                      <div class="flash-stat-item">
+                        <div class="flash-stat-value" style="color: #52c41a;">{{ flashTodayStats.accuracy || 0 }}%</div>
+                        <div class="flash-stat-label">今日正确率</div>
+                      </div>
+                    </div>
+                    <a-button type="primary" size="large" class="flash-entry-btn">
+                      立即开始 <ThunderboltOutlined />
+                    </a-button>
+                  </div>
+                </div>
+              </a-card>
+            </div>
 
             <div v-if="studyPlanCards.length > 0" class="study-plan-section">
               <h3 class="section-title"><ReadOutlined /> 我的备考</h3>
@@ -1383,5 +1440,126 @@ const refreshStudyPlans = async () => {
 }
 .badge-locked .badge-label {
   color: #999;
+}
+
+.flash-entry-card {
+  border-radius: 16px;
+  overflow: hidden;
+  border: none;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  box-shadow: 0 8px 24px rgba(102, 126, 234, 0.35);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
+}
+.flash-entry-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 32px rgba(102, 126, 234, 0.45);
+}
+.flash-entry-body {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 32px 36px;
+  gap: 24px;
+  color: white;
+}
+.flash-entry-left {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  flex: 1;
+}
+.flash-entry-icon-wrap {
+  width: 72px;
+  height: 72px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(4px);
+  flex-shrink: 0;
+}
+.flash-entry-icon {
+  font-size: 36px;
+  color: #ffd666;
+  text-shadow: 0 2px 8px rgba(0,0,0,0.15);
+}
+.flash-entry-info {
+  flex: 1;
+}
+.flash-entry-title {
+  font-size: 22px;
+  font-weight: 700;
+  margin-bottom: 8px;
+  color: white;
+  letter-spacing: 0.5px;
+}
+.flash-entry-desc {
+  font-size: 14px;
+  opacity: 0.9;
+  margin-bottom: 12px;
+  line-height: 1.5;
+}
+.flash-entry-tags {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+:deep(.flash-entry-tags .ant-tag) {
+  border: none;
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+  backdrop-filter: blur(4px);
+  font-size: 12px;
+  padding: 2px 10px;
+  border-radius: 12px;
+  margin: 0;
+}
+.flash-entry-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 16px;
+  flex-shrink: 0;
+}
+.flash-entry-stats {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.15);
+  padding: 12px 20px;
+  border-radius: 12px;
+  backdrop-filter: blur(4px);
+}
+.flash-stat-item {
+  text-align: center;
+  min-width: 64px;
+}
+.flash-stat-value {
+  font-size: 24px;
+  font-weight: 700;
+  color: white;
+  line-height: 1.2;
+}
+.flash-stat-label {
+  font-size: 12px;
+  opacity: 0.85;
+  margin-top: 2px;
+}
+.flash-entry-btn {
+  background: white !important;
+  color: #667eea !important;
+  border: none;
+  border-radius: 12px;
+  font-weight: 600;
+  padding: 0 28px !important;
+  height: 44px !important;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  transition: all 0.2s;
+}
+.flash-entry-btn:hover {
+  transform: scale(1.03);
+  box-shadow: 0 6px 16px rgba(0,0,0,0.2) !important;
 }
 </style>

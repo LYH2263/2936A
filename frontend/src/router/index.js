@@ -11,6 +11,7 @@ import ExamAnalysisView from '@/views/ExamAnalysisView.vue'
 import AppealStudentView from '@/views/AppealStudentView.vue'
 import AppealTeacherView from '@/views/AppealTeacherView.vue'
 import FeedbackTeacherView from '@/views/FeedbackTeacherView.vue'
+import FlashPracticeView from '@/views/FlashPracticeView.vue'
 
 const router = createRouter({
     history: createWebHistory(import.meta.env.BASE_URL),
@@ -83,6 +84,12 @@ const router = createRouter({
             name: 'feedback-teacher',
             component: FeedbackTeacherView,
             meta: { requiresAuth: true, role: 'TEACHER' }
+        },
+        {
+            path: '/flash-practice',
+            name: 'flash-practice',
+            component: FlashPracticeView,
+            meta: { requiresAuth: true, role: 'STUDENT' }
         }
     ]
 })
