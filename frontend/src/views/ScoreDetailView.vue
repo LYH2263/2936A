@@ -2,12 +2,12 @@
 import { ref, onMounted, computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useAuthStore } from '@/stores/auth';
-import { getSubmission, getExamQuestions, submitAppeal, getMyAppeals } from '@/api';
+import { getSubmission, getExamQuestions, submitAppeal, getMyAppeals, submitFeedback, getMyFeedbacks } from '@/api';
 import { message } from 'ant-design-vue';
 import { 
   LeftOutlined, CheckCircleFilled, CloseCircleFilled, 
   InfoCircleOutlined, TrophyOutlined, ClockCircleOutlined,
-  CalendarOutlined, UserOutlined, AlertOutlined
+  CalendarOutlined, UserOutlined, AlertOutlined, FlagOutlined
 } from '@ant-design/icons-vue';
 
 const route = useRoute();
@@ -25,6 +25,21 @@ const appealingQuestionIndex = ref(null);
 const appealReason = ref('');
 const submittingAppeal = ref(false);
 
+const existingFeedbacks = ref([]);
+const feedbackModalVisible = ref(false);
+const feedbackQuestionId = ref(null);
+const feedbackQuestionIndex = ref(null);
+const feedbackType = ref('ANSWER_ERROR');
+const feedbackDescription = ref('');
+const submittingFeedback = ref(false);
+
+const feedbackTypeOptions = [
+  { value: 'ANSWER_ERROR', label: '答案错误' },
+  { value: 'QUESTION_UNCLEAR', label: '题干不清' },
+  { value: 'OPTION_DUPLICATE', label: '选项重复' },
+  { value: 'OTHER', label: '其他' }
+];
+
 const fetchData = async () => {
   try {
     const subRes = await getSubmission(submissionId);
@@ -37,6 +52,10 @@ const fetchData = async () => {
       try {
         const appealRes = await getMyAppeals();
         existingAppeals.value = appealRes.data;
+      } catch (e) { /* ignore */ }
+      try {
+        const fbRes = await getMyFeedbacks();
+        existingFeedbacks.value = fbRes.data;
       } catch (e) { /* ignore */ }
     }
   } catch (e) {
@@ -129,6 +148,57 @@ const formatDate = (dateStr) => {
   return new Date(dateStr).toLocaleString();
 };
 
+const hasRecentFeedback = (qId) => {
+  const now = new Date();
+  const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+  return existingFeedbacks.value.some(fb => {
+    if (fb.question?.id !== qId && fb.question !== qId) return false;
+    if (fb.status === 'PENDING') return true;
+    const created = new Date(fb.createdAt);
+    return created > twentyFourHoursAgo;
+  });
+};
+
+const getFeedbackStatus = (qId) => {
+  const fb = existingFeedbacks.value.find(f => f.question?.id === qId || f.question === qId);
+  return fb ? fb.status : null;
+};
+
+const openFeedbackModal = (qId, questionIndex) => {
+  feedbackQuestionId.value = qId;
+  feedbackQuestionIndex.value = questionIndex;
+  feedbackType.value = 'ANSWER_ERROR';
+  feedbackDescription.value = '';
+  feedbackModalVisible.value = true;
+};
+
+const handleFeedbackSubmit = async () => {
+  if (!feedbackType.value) {
+    message.warning('请选择问题类型');
+    return;
+  }
+  if (feedbackDescription.value.length > 500) {
+    message.warning('补充说明不能超过500字');
+    return;
+  }
+  submittingFeedback.value = true;
+  try {
+    await submitFeedback({
+      questionId: feedbackQuestionId.value,
+      type: feedbackType.value,
+      description: feedbackDescription.value.trim()
+    });
+    message.success('纠错已提交，感谢您的反馈');
+    feedbackModalVisible.value = false;
+    fetchData();
+  } catch (e) {
+    const msg = e.response?.data?.message || '提交纠错失败';
+    message.error(msg);
+  } finally {
+    submittingFeedback.value = false;
+  }
+};
+
 onMounted(fetchData);
 </script>
 
@@ -189,6 +259,15 @@ onMounted(fetchData);
                     <a-tag v-else-if="getAppealStatus(q.question.id) === 'REJECTED'" color="red">申诉已驳回</a-tag>
                     <a-button v-else type="link" size="small" @click="openAppealModal(q.question.id, index + 1)">
                       <AlertOutlined /> 申诉
+                    </a-button>
+                    <a-divider type="vertical" />
+                    <a-button v-if="hasRecentFeedback(q.question.id)" type="link" size="small" disabled>
+                      <ClockCircleOutlined /> 已纠错
+                    </a-button>
+                    <a-tag v-else-if="getFeedbackStatus(q.question.id) === 'CONFIRMED'" color="green">纠错已确认</a-tag>
+                    <a-tag v-else-if="getFeedbackStatus(q.question.id) === 'REJECTED'" color="red">纠错已驳回</a-tag>
+                    <a-button v-else type="link" size="small" @click="openFeedbackModal(q.question.id, index + 1)">
+                      <FlagOutlined /> 报告问题
                     </a-button>
                   </template>
                </div>
@@ -269,6 +348,22 @@ onMounted(fetchData);
         </a-form-item>
         <a-form-item label="申诉理由" required>
           <a-textarea v-model:value="appealReason" placeholder="请详细说明申诉理由，最多500字" :maxlength="500" :rows="4" show-count />
+        </a-form-item>
+      </a-form>
+    </a-modal>
+
+    <a-modal v-model:open="feedbackModalVisible" title="报告问题" :confirm-loading="submittingFeedback" @ok="handleFeedbackSubmit" ok-text="提交" cancel-text="取消" width="520px">
+      <a-form layout="vertical">
+        <a-form-item label="题目">
+          <span>第 {{ feedbackQuestionIndex }} 题</span>
+        </a-form-item>
+        <a-form-item label="问题类型" required>
+          <a-radio-group v-model:value="feedbackType">
+            <a-radio v-for="opt in feedbackTypeOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</a-radio>
+          </a-radio-group>
+        </a-form-item>
+        <a-form-item label="补充说明">
+          <a-textarea v-model:value="feedbackDescription" placeholder="请补充说明具体问题（可选），最多500字" :maxlength="500" :rows="4" show-count />
         </a-form-item>
       </a-form>
     </a-modal>

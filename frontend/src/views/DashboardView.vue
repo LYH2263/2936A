@@ -3,13 +3,14 @@ import { ref, computed, onMounted, watch, h, shallowRef } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { useAuthStore } from '@/stores/auth';
 import { useConfigStore } from '@/stores/config';
-import { getExams, getMySubmissions, publishExam, deleteExam, getExamSubmissions, updateProfile, getSystemConfig, getStudentStats, getTeacherStats, getPendingAppealCount, checkCertEligibility, downloadCertificate } from '@/api';
+import { getExams, getMySubmissions, publishExam, deleteExam, getExamSubmissions, updateProfile, getSystemConfig, getStudentStats, getTeacherStats, getPendingAppealCount, getPendingFeedbackCount, checkCertEligibility, downloadCertificate } from '@/api';
 import { message } from 'ant-design-vue';
 import { 
   UserOutlined, LogoutOutlined, PlusOutlined, UnorderedListOutlined, 
   BankOutlined, ProfileOutlined, BookOutlined, TeamOutlined, FileTextOutlined,
   SettingOutlined, DashboardOutlined, TrophyOutlined, HourglassOutlined, ReadOutlined,
-  SearchOutlined, BarsOutlined, AlertOutlined, SafetyCertificateOutlined, DownloadOutlined
+  SearchOutlined, BarsOutlined, AlertOutlined, SafetyCertificateOutlined, DownloadOutlined,
+  FlagOutlined
 } from '@ant-design/icons-vue';
 import CreateExamModal from '@/components/CreateExamModal.vue';
 import AddQuestionModal from '@/components/AddQuestionModal.vue';
@@ -55,6 +56,7 @@ watch(() => route.query.tab, (newTab) => {
 
 const loading = ref(false);
 const pendingAppealCount = ref(0);
+const pendingFeedbackCount = ref(0);
 
 const checkNotifications = async () => {
   try {
@@ -136,6 +138,10 @@ const fetchData = async () => {
         const appealRes = await getPendingAppealCount();
         pendingAppealCount.value = appealRes.data.count || 0;
       } catch (e) { /* ignore */ }
+      try {
+        const fbRes = await getPendingFeedbackCount();
+        pendingFeedbackCount.value = fbRes.data.count || 0;
+      } catch (e) { /* ignore */ }
     }
   } catch (e) {
     console.error('Failed to fetch data', e);
@@ -161,6 +167,10 @@ const handleMenuClick = ({ key }) => {
   }
   if (key === 'appeal-review') {
     router.push('/appeals/teacher');
+    return;
+  }
+  if (key === 'feedback-review') {
+    router.push('/feedbacks/teacher');
     return;
   }
   activeTab.value = key;
@@ -403,6 +413,11 @@ const handleCertTooltip = (sub) => {
           <span>申诉处理台</span>
           <a-badge :count="pendingAppealCount" :overflow-count="99" style="margin-left: 8px;" v-if="pendingAppealCount > 0" />
         </a-menu-item>
+        <a-menu-item key="feedback-review" v-if="authStore.isTeacher">
+          <FlagOutlined />
+          <span>纠错工单</span>
+          <a-badge :count="pendingFeedbackCount" :overflow-count="99" style="margin-left: 8px;" v-if="pendingFeedbackCount > 0" />
+        </a-menu-item>
         <a-menu-item key="users" v-if="authStore.isTeacher || authStore.isAdmin">
           <TeamOutlined />
           <span>用户管理</span>
@@ -429,6 +444,7 @@ const handleCertTooltip = (sub) => {
               'scores': '我的成绩', 
               'my-appeals': '我的申诉',
               'appeal-review': '申诉处理台',
+              'feedback-review': '纠错工单',
               'users': '用户管理', 
               'config': '系统设置', 
               'profile': '个人资料' 

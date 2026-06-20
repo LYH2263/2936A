@@ -87,6 +87,11 @@ public class SecurityConfig {
                         .requestMatchers("/api/appeals").hasRole("STUDENT")
                         .requestMatchers("/api/appeals/my").hasRole("STUDENT")
                         .requestMatchers("/api/appeals/**").authenticated()
+                        .requestMatchers("/api/feedbacks/pending", "/api/feedbacks/pending-count").hasAnyRole("TEACHER", "ADMIN")
+                        .requestMatchers("/api/feedbacks/*/process").hasAnyRole("TEACHER", "ADMIN")
+                        .requestMatchers("/api/feedbacks").hasRole("STUDENT")
+                        .requestMatchers("/api/feedbacks/my").hasRole("STUDENT")
+                        .requestMatchers("/api/feedbacks/**").authenticated()
                         .anyRequest().authenticated()
                 )
                 .exceptionHandling(exception -> exception

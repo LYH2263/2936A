@@ -10,6 +10,7 @@ import ExamPublishView from '@/views/ExamPublishView.vue'
 import ExamAnalysisView from '@/views/ExamAnalysisView.vue'
 import AppealStudentView from '@/views/AppealStudentView.vue'
 import AppealTeacherView from '@/views/AppealTeacherView.vue'
+import FeedbackTeacherView from '@/views/FeedbackTeacherView.vue'
 
 const router = createRouter({
     history: createWebHistory(import.meta.env.BASE_URL),
@@ -75,6 +76,12 @@ const router = createRouter({
             path: '/appeals/teacher',
             name: 'appeal-teacher',
             component: AppealTeacherView,
+            meta: { requiresAuth: true, role: 'TEACHER' }
+        },
+        {
+            path: '/feedbacks/teacher',
+            name: 'feedback-teacher',
+            component: FeedbackTeacherView,
             meta: { requiresAuth: true, role: 'TEACHER' }
         }
     ]

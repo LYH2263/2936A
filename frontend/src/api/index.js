@@ -94,6 +94,13 @@ export const getPendingAppeals = () => api.get('/appeals/pending');
 export const getPendingAppealCount = () => api.get('/appeals/pending-count');
 export const processAppeal = (id, data) => api.post(`/appeals/${id}/process`, data);
 
+export const submitFeedback = (data) => api.post('/feedbacks', data);
+export const getMyFeedbacks = () => api.get('/feedbacks/my');
+export const getPendingFeedbacks = () => api.get('/feedbacks/pending');
+export const getPendingFeedbackCount = () => api.get('/feedbacks/pending-count');
+export const processFeedback = (id, data) => api.post(`/feedbacks/${id}/process`, data);
+export const getQuestionExams = (questionId) => api.get(`/feedbacks/question-exams/${questionId}`);
+
 // User Management
 export const getUsers = (params) => api.get('/users', { params });
 export const createUser = (data) => api.post('/users', data);
