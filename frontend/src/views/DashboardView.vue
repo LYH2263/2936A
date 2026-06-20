@@ -3,14 +3,14 @@ import { ref, computed, onMounted, watch, h, shallowRef } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { useAuthStore } from '@/stores/auth';
 import { useConfigStore } from '@/stores/config';
-import { getExams, getMySubmissions, publishExam, deleteExam, getExamSubmissions, updateProfile, getSystemConfig, getStudentStats, getTeacherStats, getPendingAppealCount, getPendingFeedbackCount, checkCertEligibility, downloadCertificate } from '@/api';
+import { getExams, getMySubmissions, publishExam, deleteExam, getExamSubmissions, updateProfile, getSystemConfig, getStudentStats, getTeacherStats, getPendingAppealCount, getPendingFeedbackCount, checkCertEligibility, downloadCertificate, getStudyPlanDashboard } from '@/api';
 import { message } from 'ant-design-vue';
 import { 
   UserOutlined, LogoutOutlined, PlusOutlined, UnorderedListOutlined, 
   BankOutlined, ProfileOutlined, BookOutlined, TeamOutlined, FileTextOutlined,
   SettingOutlined, DashboardOutlined, TrophyOutlined, HourglassOutlined, ReadOutlined,
   SearchOutlined, BarsOutlined, AlertOutlined, SafetyCertificateOutlined, DownloadOutlined,
-  FlagOutlined
+  FlagOutlined, FireOutlined
 } from '@ant-design/icons-vue';
 import CreateExamModal from '@/components/CreateExamModal.vue';
 import AddQuestionModal from '@/components/AddQuestionModal.vue';
@@ -23,6 +23,7 @@ import { getNotifications, markNotificationRead } from '@/api';
 import { notification, Button as AButton } from 'ant-design-vue';
 import SystemConfigView from '@/views/SystemConfigView.vue';
 import AnnouncementManageModal from '@/components/AnnouncementManageModal.vue';
+import StudyPlanModal from '@/components/StudyPlanModal.vue';
 import { NotificationOutlined } from '@ant-design/icons-vue';
 
 const router = useRouter();
@@ -59,6 +60,10 @@ watch(() => route.query.tab, (newTab) => {
 const loading = ref(false);
 const pendingAppealCount = ref(0);
 const pendingFeedbackCount = ref(0);
+const studyPlanCards = ref([]);
+const studyPlanModalVisible = ref(false);
+const studyPlanExamId = ref(null);
+const studyPlanExamTitle = ref('');
 
 const checkNotifications = async () => {
   try {
@@ -134,6 +139,10 @@ const fetchData = async () => {
       stats.value = statsRes.data;
       checkNotifications();
       fetchCertEligibility();
+      try {
+        const spRes = await getStudyPlanDashboard();
+        studyPlanCards.value = spRes.data || [];
+      } catch (e) { /* ignore */ }
     } else if (authStore.isTeacher) {
       const tStatsRes = await getTeacherStats();
       teacherStats.value = tStatsRes.data;
@@ -387,6 +396,19 @@ const handleCertTooltip = (sub) => {
   if (info.eligible) return '点击下载合格证书';
   return info.reason || '不可下载';
 };
+
+const openStudyPlanFromDashboard = (card) => {
+  studyPlanExamId.value = card.examId;
+  studyPlanExamTitle.value = card.examTitle;
+  studyPlanModalVisible.value = true;
+};
+
+const refreshStudyPlans = async () => {
+  try {
+    const spRes = await getStudyPlanDashboard();
+    studyPlanCards.value = spRes.data || [];
+  } catch (e) { /* ignore */ }
+};
 </script>
 
 <template>
@@ -504,6 +526,44 @@ const handleCertTooltip = (sub) => {
                 </a-col>
               </a-row>
             </a-skeleton>
+
+            <div v-if="studyPlanCards.length > 0" class="study-plan-section">
+              <h3 class="section-title"><ReadOutlined /> 我的备考</h3>
+              <a-row :gutter="16">
+                <a-col v-for="card in studyPlanCards" :key="card.planId" :span="8">
+                  <a-card class="study-plan-card" hoverable @click="openStudyPlanFromDashboard(card)">
+                    <div class="sp-card-body">
+                      <div class="sp-card-info">
+                        <div class="sp-exam-title">{{ card.examTitle }}</div>
+                        <div class="sp-meta">
+                          <span v-if="card.daysUntilExam !== null" class="sp-countdown">
+                            <ClockCircleOutlined /> 距考试 <b>{{ card.daysUntilExam }}</b> 天
+                          </span>
+                          <span class="sp-streak">
+                            <FireOutlined /> 连续 <b>{{ card.streakDays }}</b> 天
+                          </span>
+                        </div>
+                        <div class="sp-task-progress">
+                          今日任务: {{ card.completedTasksToday }}/{{ card.totalTasksToday }}
+                        </div>
+                      </div>
+                      <div class="sp-ring">
+                        <a-progress
+                          type="circle"
+                          :percent="Math.round(card.todayProgress || 0)"
+                          :size="64"
+                          :stroke-color="card.todayProgress >= 100 ? '#52c41a' : '#1890ff'"
+                        >
+                          <template #format="{ percent }">
+                            <span style="font-size: 13px; font-weight: 600;">{{ percent }}%</span>
+                          </template>
+                        </a-progress>
+                      </div>
+                    </div>
+                  </a-card>
+                </a-col>
+              </a-row>
+            </div>
 
             <a-row :gutter="16" style="margin-top: 24px;" type="flex">
               <a-col :span="14">
@@ -879,6 +939,14 @@ const handleCertTooltip = (sub) => {
       @success="fetchData"
     />
 
+    <StudyPlanModal
+      v-if="studyPlanExamId"
+      v-model:open="studyPlanModalVisible"
+      :examId="studyPlanExamId"
+      :examTitle="studyPlanExamTitle"
+      @created="refreshStudyPlans"
+    />
+
     </a-layout>
   </a-layout>
 </template>
@@ -964,5 +1032,66 @@ const handleCertTooltip = (sub) => {
 :deep(.ant-statistic-content) {
   font-weight: 700;
   color: var(--text-main);
+}
+.study-plan-section {
+  margin-top: 24px;
+}
+.section-title {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-main);
+}
+.study-plan-card {
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+  border: 1px solid #f0f0f0;
+  transition: all 0.3s;
+}
+.study-plan-card:hover {
+  box-shadow: 0 6px 20px rgba(24, 144, 255, 0.15);
+  border-color: #bae7ff;
+}
+.sp-card-body {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+}
+.sp-card-info {
+  flex: 1;
+}
+.sp-exam-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #1a1a1a;
+  margin-bottom: 8px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sp-meta {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 6px;
+  font-size: 13px;
+  color: #666;
+}
+.sp-countdown b {
+  color: #f5222d;
+}
+.sp-streak b {
+  color: #fa8c16;
+}
+.sp-task-progress {
+  font-size: 12px;
+  color: #999;
+}
+.sp-ring {
+  flex-shrink: 0;
 }
 </style>

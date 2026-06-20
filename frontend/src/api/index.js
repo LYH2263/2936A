@@ -127,4 +127,13 @@ export const getAnnouncementUnreadCount = (examId) => api.get(`/exams/${examId}/
 export const markAnnouncementRead = (announcementId) => api.post(`/exams/announcements/${announcementId}/read`);
 export const markAllAnnouncementsRead = (examId) => api.post(`/exams/${examId}/announcements/read-all`);
 
+// Study Plans
+export const createStudyPlan = (data) => api.post('/study-plans', data);
+export const getStudyPlanByExam = (examId) => api.get(`/study-plans/exam/${examId}`);
+export const getMyStudyPlans = () => api.get('/study-plans/my');
+export const getStudyPlanDashboard = () => api.get('/study-plans/dashboard');
+export const checkInStudyPlanTask = (planId, data) => api.post(`/study-plans/${planId}/check-in`, data);
+export const addStudyPlanTask = (planId, data) => api.post(`/study-plans/${planId}/tasks`, data);
+export const deleteStudyPlanTask = (planId, taskId) => api.delete(`/study-plans/${planId}/tasks/${taskId}`);
+
 export default api;

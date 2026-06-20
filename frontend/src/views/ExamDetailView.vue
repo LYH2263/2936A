@@ -6,12 +6,15 @@ import {
   ClockCircleOutlined, CalendarOutlined, BookOutlined, 
   LeftOutlined, SafetyCertificateOutlined, EyeOutlined,
   CloudOutlined, InfoCircleOutlined, NotificationOutlined,
-  PushpinFilled, CheckOutlined, BellFilled
+  PushpinFilled, CheckOutlined, BellFilled, ReadOutlined
 } from '@ant-design/icons-vue';
 import { message } from 'ant-design-vue';
+import { useAuthStore } from '@/stores/auth';
+import StudyPlanModal from '@/components/StudyPlanModal.vue';
 
 const route = useRoute();
 const router = useRouter();
+const authStore = useAuthStore();
 const examId = route.params.id;
 const exam = ref(null);
 const loading = ref(true);
@@ -113,6 +116,14 @@ const startExam = () => {
 
 const goBack = () => {
   router.back();
+};
+
+const studyPlanVisible = ref(false);
+
+const isStudent = computed(() => authStore.user?.role === 'STUDENT');
+
+const showStudyPlan = () => {
+  studyPlanVisible.value = true;
 };
 </script>
 
@@ -262,6 +273,15 @@ const goBack = () => {
                 <div v-if="status.text === '未开始'" class="countdown-hint">
                   <ClockCircleOutlined /> 距离开考还有 24:00:00
                 </div>
+                <a-button
+                  v-if="isStudent"
+                  block
+                  size="large"
+                  class="study-plan-btn"
+                  @click="showStudyPlan"
+                >
+                  <ReadOutlined /> {{ status.text === '未开始' ? '制定备考计划' : '查看备考计划' }}
+                </a-button>
                 <a-button type="primary" block size="large" :disabled="!canStart" @click="startExam" class="primary-start-btn">
                    {{ canStart ? '正式进入考试' : '尚未开始或已结束' }}
                 </a-button>
@@ -273,6 +293,12 @@ const goBack = () => {
     <div v-else class="loading-state">
        <a-spin size="large" />
     </div>
+
+    <StudyPlanModal
+      v-model:open="studyPlanVisible"
+      :examId="Number(examId)"
+      :examTitle="exam?.title || ''"
+    />
   </div>
 </template>
 
@@ -555,6 +581,21 @@ const goBack = () => {
   font-size: 18px;
   font-weight: 600;
   border-radius: 8px;
+}
+.study-plan-btn {
+  height: 48px;
+  font-size: 16px;
+  font-weight: 600;
+  border-radius: 8px;
+  margin-bottom: 12px;
+  color: #1890ff;
+  border-color: #1890ff;
+  background: #e6f7ff;
+}
+.study-plan-btn:hover {
+  color: #40a9ff;
+  border-color: #40a9ff;
+  background: #f0faff;
 }
 
 .loading-state {
