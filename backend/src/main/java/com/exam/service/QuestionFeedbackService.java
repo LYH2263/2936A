@@ -19,15 +19,18 @@ public class QuestionFeedbackService {
     private final QuestionRepository questionRepository;
     private final UserRepository userRepository;
     private final NotificationService notificationService;
+    private final BadgeService badgeService;
 
     public QuestionFeedbackService(QuestionFeedbackRepository feedbackRepository,
                                    QuestionRepository questionRepository,
                                    UserRepository userRepository,
-                                   NotificationService notificationService) {
+                                   NotificationService notificationService,
+                                   BadgeService badgeService) {
         this.feedbackRepository = feedbackRepository;
         this.questionRepository = questionRepository;
         this.userRepository = userRepository;
         this.notificationService = notificationService;
+        this.badgeService = badgeService;
     }
 
     @Transactional
@@ -100,6 +103,7 @@ public class QuestionFeedbackService {
 
         if ("CONFIRM".equals(action)) {
             feedback.setStatus("CONFIRMED");
+            badgeService.checkCorrectionExpert(feedback.getStudent());
         } else if ("REJECT".equals(action)) {
             feedback.setStatus("REJECTED");
         } else {

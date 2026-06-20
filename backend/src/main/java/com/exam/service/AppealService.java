@@ -16,15 +16,18 @@ public class AppealService {
     private final SubmissionRepository submissionRepository;
     private final SubmissionAnswerRepository submissionAnswerRepository;
     private final UserRepository userRepository;
+    private final BadgeService badgeService;
 
     public AppealService(AppealRepository appealRepository,
                          SubmissionRepository submissionRepository,
                          SubmissionAnswerRepository submissionAnswerRepository,
-                         UserRepository userRepository) {
+                         UserRepository userRepository,
+                         BadgeService badgeService) {
         this.appealRepository = appealRepository;
         this.submissionRepository = submissionRepository;
         this.submissionAnswerRepository = submissionAnswerRepository;
         this.userRepository = userRepository;
+        this.badgeService = badgeService;
     }
 
     @Transactional
@@ -122,6 +125,8 @@ public class AppealService {
             }
             submission.setScore(totalScore);
             submissionRepository.save(submission);
+
+            badgeService.checkAppealWin(appeal.getStudent());
 
         } else if ("REJECT".equals(action)) {
             appeal.setStatus("REJECTED");

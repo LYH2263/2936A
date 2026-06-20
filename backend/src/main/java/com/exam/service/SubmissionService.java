@@ -19,14 +19,16 @@ public class SubmissionService {
     private final QuestionRepository questionRepository;
     private final UserRepository userRepository;
     private final ExamQuestionRepository examQuestionRepository;
+    private final BadgeService badgeService;
 
-    public SubmissionService(SubmissionRepository submissionRepository, SubmissionAnswerRepository submissionAnswerRepository, ExamRepository examRepository, QuestionRepository questionRepository, UserRepository userRepository, ExamQuestionRepository examQuestionRepository) {
+    public SubmissionService(SubmissionRepository submissionRepository, SubmissionAnswerRepository submissionAnswerRepository, ExamRepository examRepository, QuestionRepository questionRepository, UserRepository userRepository, ExamQuestionRepository examQuestionRepository, BadgeService badgeService) {
         this.submissionRepository = submissionRepository;
         this.submissionAnswerRepository = submissionAnswerRepository;
         this.examRepository = examRepository;
         this.questionRepository = questionRepository;
         this.userRepository = userRepository;
         this.examQuestionRepository = examQuestionRepository;
+        this.badgeService = badgeService;
     }
 
     @Transactional
@@ -107,7 +109,11 @@ public class SubmissionService {
         }
         
         submission.setScore(totalScore);
-        return submissionRepository.save(submission);
+        submission = submissionRepository.save(submission);
+
+        badgeService.checkSubmissionBadges(student, submission);
+
+        return submission;
     }
     
     public List<Submission> getStudentSubmissions(String username) {
@@ -173,6 +179,8 @@ public class SubmissionService {
         
         submission.setScore(totalScore);
         submissionRepository.save(submission);
+
+        badgeService.checkAfterGrading(submission.getStudent());
     }
 
     public StudentStatsDTO getStudentStats(String username) {

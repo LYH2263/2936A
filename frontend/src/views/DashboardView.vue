@@ -3,14 +3,15 @@ import { ref, computed, onMounted, watch, h, shallowRef } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { useAuthStore } from '@/stores/auth';
 import { useConfigStore } from '@/stores/config';
-import { getExams, getMySubmissions, publishExam, deleteExam, getExamSubmissions, updateProfile, getSystemConfig, getStudentStats, getTeacherStats, getPendingAppealCount, getPendingFeedbackCount, checkCertEligibility, downloadCertificate, getStudyPlanDashboard, getCommentTemplates, createCommentTemplate, updateCommentTemplate, deleteCommentTemplate } from '@/api';
+import { getExams, getMySubmissions, publishExam, deleteExam, getExamSubmissions, updateProfile, getSystemConfig, getStudentStats, getTeacherStats, getPendingAppealCount, getPendingFeedbackCount, checkCertEligibility, downloadCertificate, getStudyPlanDashboard, getCommentTemplates, createCommentTemplate, updateCommentTemplate, deleteCommentTemplate, getMyBadges } from '@/api';
 import { message } from 'ant-design-vue';
 import { 
   UserOutlined, LogoutOutlined, PlusOutlined, UnorderedListOutlined, 
   BankOutlined, ProfileOutlined, BookOutlined, TeamOutlined, FileTextOutlined,
   SettingOutlined, DashboardOutlined, TrophyOutlined, HourglassOutlined, ReadOutlined,
   SearchOutlined, BarsOutlined, AlertOutlined, SafetyCertificateOutlined, DownloadOutlined,
-  FlagOutlined, FireOutlined, FormOutlined, EditOutlined, DeleteOutlined, GlobalOutlined
+  FlagOutlined, FireOutlined, FormOutlined, EditOutlined, DeleteOutlined, GlobalOutlined,
+  AppstoreOutlined, ClockCircleOutlined, SecurityScanOutlined
 } from '@ant-design/icons-vue';
 import CreateExamModal from '@/components/CreateExamModal.vue';
 import AddQuestionModal from '@/components/AddQuestionModal.vue';
@@ -64,6 +65,22 @@ const studyPlanCards = ref([]);
 const studyPlanModalVisible = ref(false);
 const studyPlanExamId = ref(null);
 const studyPlanExamTitle = ref('');
+
+const badges = ref([]);
+const badgesLoading = ref(false);
+
+const fetchBadges = async () => {
+  if (authStore.user?.role !== 'STUDENT') return;
+  badgesLoading.value = true;
+  try {
+    const res = await getMyBadges();
+    badges.value = res.data || [];
+  } catch (e) {
+    console.error('Failed to fetch badges', e);
+  } finally {
+    badgesLoading.value = false;
+  }
+};
 
 const checkNotifications = async () => {
   try {
@@ -150,6 +167,7 @@ const fetchData = async () => {
       stats.value = statsRes.data;
       checkNotifications();
       fetchCertEligibility();
+      fetchBadges();
       try {
         const spRes = await getStudyPlanDashboard();
         studyPlanCards.value = spRes.data || [];
@@ -198,6 +216,9 @@ const handleMenuClick = ({ key }) => {
   }
   if (key === 'comment-templates') {
     fetchCommentTemplates();
+  }
+  if (key === 'profile' && authStore.user?.role === 'STUDENT') {
+    fetchBadges();
   }
   activeTab.value = key;
   router.push({ path: '/dashboard', query: { tab: key } });
@@ -655,6 +676,23 @@ const refreshStudyPlans = async () => {
               </a-row>
             </div>
 
+            <div class="badge-wall-section">
+              <h3 class="section-title"><TrophyOutlined /> 勋章墙</h3>
+              <a-skeleton :loading="badgesLoading" active :paragraph="{ rows: 2 }">
+                <a-row :gutter="[16, 16]">
+                  <a-col v-for="badge in badges" :key="badge.code" :xs="8" :sm="8" :md="4">
+                    <a-tooltip :title="badge.earned ? `${badge.label} — ${badge.description}（${new Date(badge.earnedAt).toLocaleDateString()} 获得）` : `${badge.label} — ${badge.description}`">
+                      <div :class="['badge-card', badge.earned ? 'badge-earned' : 'badge-locked']">
+                        <span class="badge-icon">{{ badge.icon }}</span>
+                        <div class="badge-label">{{ badge.label }}</div>
+                      </div>
+                    </a-tooltip>
+                  </a-col>
+                </a-row>
+                <a-empty v-if="badges.length === 0 && !badgesLoading" description="暂无勋章" />
+              </a-skeleton>
+            </div>
+
             <a-row :gutter="16" style="margin-top: 24px;" type="flex">
               <a-col :span="14">
                 <a-card title="待参加考试快照" :bordered="false" class="premium-card">
@@ -969,6 +1007,22 @@ const refreshStudyPlans = async () => {
                    </a-descriptions-item>
                  </a-descriptions>
               </a-card>
+
+             <a-card v-if="authStore.user?.role === 'STUDENT'" title="我的勋章" style="max-width: 800px; margin-top: 24px;">
+               <a-skeleton :loading="badgesLoading" active :paragraph="{ rows: 2 }">
+                 <a-row :gutter="[16, 16]">
+                   <a-col v-for="badge in badges" :key="badge.code" :xs="8" :sm="6" :md="4">
+                     <a-tooltip :title="badge.earned ? `${badge.label} — ${badge.description}（${new Date(badge.earnedAt).toLocaleDateString()} 获得）` : `${badge.label} — ${badge.description}`">
+                       <div :class="['badge-card', badge.earned ? 'badge-earned' : 'badge-locked']">
+                         <span class="badge-icon">{{ badge.icon }}</span>
+                         <div class="badge-label">{{ badge.label }}</div>
+                       </div>
+                     </a-tooltip>
+                   </a-col>
+                 </a-row>
+                 <a-empty v-if="badges.length === 0 && !badgesLoading" description="暂无勋章" />
+               </a-skeleton>
+             </a-card>
           </div>
 
           <!-- COMMENT TEMPLATES -->
@@ -1281,5 +1335,53 @@ const refreshStudyPlans = async () => {
 }
 .sp-ring {
   flex-shrink: 0;
+}
+.badge-wall-section {
+  margin-top: 24px;
+}
+.badge-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 16px 8px;
+  border-radius: 12px;
+  border: 1px solid #f0f0f0;
+  transition: all 0.3s;
+  cursor: default;
+  min-height: 100px;
+}
+.badge-card.badge-earned {
+  background: linear-gradient(135deg, #fffbe6 0%, #fff1b8 100%);
+  border-color: #ffe58f;
+  box-shadow: 0 2px 8px rgba(250, 173, 20, 0.15);
+}
+.badge-card.badge-earned:hover {
+  box-shadow: 0 4px 16px rgba(250, 173, 20, 0.3);
+  transform: translateY(-2px);
+}
+.badge-card.badge-locked {
+  background: #fafafa;
+  border-color: #f0f0f0;
+  opacity: 0.45;
+  filter: grayscale(1);
+}
+.badge-icon {
+  font-size: 32px;
+  margin-bottom: 8px;
+  line-height: 1;
+}
+.badge-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #1a1a1a;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+.badge-locked .badge-label {
+  color: #999;
 }
 </style>

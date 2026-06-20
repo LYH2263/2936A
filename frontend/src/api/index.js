@@ -145,4 +145,6 @@ export const createCommentTemplate = (data) => api.post('/comment-templates', da
 export const updateCommentTemplate = (id, data) => api.put(`/comment-templates/${id}`, data);
 export const deleteCommentTemplate = (id) => api.delete(`/comment-templates/${id}`);
 
+export const getMyBadges = () => api.get('/badges/my');
+
 export default api;
