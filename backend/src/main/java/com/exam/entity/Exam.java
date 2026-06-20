@@ -46,6 +46,12 @@ public class Exam {
     private String targetAudience = "ALL"; // ALL, CUSTOM
     private String targetIds; // Comma separated user IDs or usernames
 
+    // Certificate
+    private Boolean enableCert = false;
+    private String certTitle;
+    private String certIssuer;
+    private Integer certPassScore;
+
     @ManyToOne
     @JoinColumn(name = "creator_id")
     private User creator;

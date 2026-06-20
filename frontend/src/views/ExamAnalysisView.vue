@@ -1,13 +1,13 @@
 <script setup>
 import { ref, shallowRef, onMounted, computed, nextTick, h } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { getStatistics, exportExamStatistics } from '@/api';
+import { getStatistics, exportExamStatistics, previewCertificate } from '@/api';
 import * as echarts from 'echarts';
 import { message } from 'ant-design-vue';
 import { 
   DownloadOutlined, UserOutlined, FileTextOutlined, 
   BarChartOutlined, PrinterOutlined, LeftOutlined,
-  DashboardOutlined, TeamOutlined, RiseOutlined
+  DashboardOutlined, TeamOutlined, RiseOutlined, SafetyCertificateOutlined
 } from '@ant-design/icons-vue';
 import dayjs from 'dayjs';
 
@@ -152,6 +152,18 @@ const handleViewSubmission = (submissionId) => {
   router.push(`/score/${submissionId}`);
 };
 
+const handlePreviewCert = async () => {
+  try {
+    const res = await previewCertificate(examId);
+    const blob = new Blob([res.data], { type: 'application/pdf' });
+    const url = window.URL.createObjectURL(blob);
+    window.open(url, '_blank');
+    message.success('证书预览已在新窗口打开');
+  } catch (e) {
+    message.error('证书预览生成失败，请确认已启用合格证书');
+  }
+};
+
 onMounted(fetchStats);
 
 const rankingColumns = [
@@ -191,6 +203,9 @@ const handleTabChange = (key) => {
       </div>
       <div class="header-right no-print">
          <a-space>
+             <a-button v-if="stats?.enableCert" @click="handlePreviewCert">
+               <SafetyCertificateOutlined /> 预览证书
+             </a-button>
              <a-button @click="window.print()">
                <PrinterOutlined /> 打印报告
              </a-button>

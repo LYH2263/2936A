@@ -16,7 +16,12 @@ public class ExamStatistics {
     private int minScore;
     private double passRate; // percentage
     private Map<String, Integer> scoreDistribution; // e.g. "0-59": 5
-    
+
+    private Boolean enableCert;
+    private String certTitle;
+    private String certIssuer;
+    private Integer certPassScore;
+
     private List<StudentRanking> rankings;
     private List<QuestionStat> questionAnalysis;
 

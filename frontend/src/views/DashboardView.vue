@@ -3,13 +3,13 @@ import { ref, computed, onMounted, watch, h, shallowRef } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { useAuthStore } from '@/stores/auth';
 import { useConfigStore } from '@/stores/config';
-import { getExams, getMySubmissions, publishExam, deleteExam, getExamSubmissions, updateProfile, getSystemConfig, getStudentStats, getTeacherStats, getPendingAppealCount } from '@/api';
+import { getExams, getMySubmissions, publishExam, deleteExam, getExamSubmissions, updateProfile, getSystemConfig, getStudentStats, getTeacherStats, getPendingAppealCount, checkCertEligibility, downloadCertificate } from '@/api';
 import { message } from 'ant-design-vue';
 import { 
   UserOutlined, LogoutOutlined, PlusOutlined, UnorderedListOutlined, 
   BankOutlined, ProfileOutlined, BookOutlined, TeamOutlined, FileTextOutlined,
   SettingOutlined, DashboardOutlined, TrophyOutlined, HourglassOutlined, ReadOutlined,
-  SearchOutlined, BarsOutlined, AlertOutlined
+  SearchOutlined, BarsOutlined, AlertOutlined, SafetyCertificateOutlined, DownloadOutlined
 } from '@ant-design/icons-vue';
 import CreateExamModal from '@/components/CreateExamModal.vue';
 import AddQuestionModal from '@/components/AddQuestionModal.vue';
@@ -128,6 +128,7 @@ const fetchData = async () => {
       const statsRes = await getStudentStats();
       stats.value = statsRes.data;
       checkNotifications();
+      fetchCertEligibility();
     } else if (authStore.isTeacher) {
       const tStatsRes = await getTeacherStats();
       teacherStats.value = tStatsRes.data;
@@ -323,6 +324,50 @@ onMounted(() => {
 const userInitial = computed(() => {
   return authStore.user?.fullName?.[0] || authStore.user?.username?.[0] || 'U';
 });
+
+const certEligibility = ref({});
+const certLoading = ref({});
+
+const fetchCertEligibility = async () => {
+  if (authStore.user?.role !== 'STUDENT') return;
+  for (const sub of submissions.value) {
+    if (sub.state !== 'SUBMITTED') continue;
+    try {
+      const res = await checkCertEligibility(sub.exam.id);
+      certEligibility.value[sub.id] = res.data;
+    } catch (e) {
+      certEligibility.value[sub.id] = { eligible: false, reason: '查询失败' };
+    }
+  }
+};
+
+const handleDownloadCert = async (sub) => {
+  certLoading.value[sub.id] = true;
+  try {
+    const res = await downloadCertificate(sub.exam.id, sub.id);
+    const blob = new Blob([res.data], { type: 'application/pdf' });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `certificate_EXAM-${sub.exam.id}-${sub.id}.pdf`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+    message.success('证书下载成功');
+  } catch (e) {
+    message.error('证书下载失败');
+  } finally {
+    certLoading.value[sub.id] = false;
+  }
+};
+
+const handleCertTooltip = (sub) => {
+  const info = certEligibility.value[sub.id];
+  if (!info) return '查询中...';
+  if (info.eligible) return '点击下载合格证书';
+  return info.reason || '不可下载';
+};
 </script>
 
 <template>
@@ -672,13 +717,33 @@ const userInitial = computed(() => {
                { title: '总分', dataIndex: 'examTotalScore', key: 'examTotalScore', customRender: ({text}) => text + ' 分' },
                { title: '排名', dataIndex: 'ranking', key: 'ranking', customRender: ({text}) => text ? `第 ${text} 名` : '未排名' },
                { title: '状态', dataIndex: 'state', key: 'state', customRender: ({text}) => text === 'SUBMITTED' ? '已提交' : (text === 'IN_PROGRESS' ? '进行中' : text) },
-               { title: '操作', key: 'action' }
+               { title: '操作', key: 'action', width: 200 }
              ]">
                <template #bodyCell="{ column, record }">
                  <template v-if="column.key === 'action'">
-                    <a-button type="link" size="small" @click="router.push(`/score/${record.id}`)">
-                     查看解析
-                   </a-button>
+                    <a-space>
+                      <a-button type="link" size="small" @click="router.push(`/score/${record.id}`)">
+                        查看解析
+                      </a-button>
+                      <a-tooltip v-if="certEligibility[record.id]" :title="handleCertTooltip(record)">
+                        <a-button
+                          type="primary"
+                          size="small"
+                          :disabled="!certEligibility[record.id]?.eligible"
+                          :loading="certLoading[record.id]"
+                          @click="handleDownloadCert(record)"
+                        >
+                          <SafetyCertificateOutlined /> 下载证书
+                        </a-button>
+                      </a-tooltip>
+                      <a-button
+                        v-else-if="record.state === 'SUBMITTED' && certEligibility[record.id] === undefined"
+                        size="small"
+                        disabled
+                      >
+                        <SafetyCertificateOutlined /> 检查中...
+                      </a-button>
+                    </a-space>
                  </template>
                </template>
              </a-table>

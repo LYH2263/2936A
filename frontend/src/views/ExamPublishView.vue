@@ -6,7 +6,7 @@ import { message } from 'ant-design-vue';
 import { 
   LeftOutlined, InfoCircleOutlined, SettingOutlined, 
   SecurityScanOutlined, CheckCircleOutlined,
-  UsergroupAddOutlined, AlertOutlined
+  UsergroupAddOutlined, AlertOutlined, SafetyCertificateOutlined
 } from '@ant-design/icons-vue';
 import dayjs from 'dayjs';
 
@@ -39,7 +39,12 @@ const formState = reactive({
   shuffleOptions: false,
   // Targeting
   targetAudience: 'ALL',
-  targetIds: ''
+  targetIds: '',
+  // Certificate
+  enableCert: false,
+  certTitle: '',
+  certIssuer: '',
+  certPassScore: null
 });
 
 const fetchExamData = async () => {
@@ -109,7 +114,8 @@ onMounted(fetchExamData);
 const steps = [
   { title: '基础设置', icon: InfoCircleOutlined },
   { title: '时间范围', icon: SettingOutlined },
-  { title: '安全质量', icon: SecurityScanOutlined }
+  { title: '安全质量', icon: SecurityScanOutlined },
+  { title: '合格证书', icon: SafetyCertificateOutlined }
 ];
 </script>
 
@@ -244,6 +250,36 @@ const steps = [
                    <a-alert type="warning" show-icon message="请确认所有设置均已检查。发布后，部分核心参数（如起止时间）的微调可能会影响已在考场中的学生。">
                       <template #icon><AlertOutlined /></template>
                    </a-alert>
+                </div>
+             </a-form>
+          </div>
+
+          <!-- Step 4: Certificate -->
+          <div v-show="currentStep === 3" class="step-content">
+             <div class="section-title">🎓 电子合格证书</div>
+             <a-form :model="formState" layout="vertical">
+                <a-card size="small" title="证书开关">
+                   <a-form-item label="启用合格证书">
+                      <a-switch v-model:checked="formState.enableCert" />
+                      <span class="switch-tip">开启后，成绩达标的学生可下载电子合格证书</span>
+                   </a-form-item>
+                </a-card>
+
+                <div v-if="formState.enableCert" style="margin-top: 16px;">
+                   <a-card size="small" title="证书模板配置">
+                      <a-form-item label="证书考试名称" name="certTitle" :rules="[{ required: true, message: '请输入证书上的考试名称' }]">
+                         <a-input v-model:value="formState.certTitle" placeholder="留空则使用考试标题" />
+                         <span class="switch-tip">证书上显示的考试名称，留空则使用上方填写的考试名称</span>
+                      </a-form-item>
+                      <a-form-item label="发证单位" name="certIssuer" :rules="[{ required: true, message: '请输入发证单位' }]">
+                         <a-input v-model:value="formState.certIssuer" placeholder="例如：XX大学教务处" />
+                      </a-form-item>
+                      <a-form-item label="最低合格分数线" name="certPassScore">
+                         <a-input-number v-model:value="formState.certPassScore" :min="0" style="width: 200px" placeholder="默认为满分的60%" />
+                         <span class="switch-tip">留空则默认取满分的60%</span>
+                      </a-form-item>
+                   </a-card>
+                   <a-alert type="info" show-icon style="margin-top: 16px" message="证书将包含学生姓名、学号、考试名称、分数、发证日期等信息，证书编号格式为 EXAM-{考试ID}-{提交ID}。" />
                 </div>
              </a-form>
           </div>

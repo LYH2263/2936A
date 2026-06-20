@@ -105,4 +105,8 @@ export const importUsers = (formData) => api.post('/users/import', formData, {
 export const exportUsers = () => api.get('/users/export', { responseType: 'blob' });
 export const resetUserPassword = (id, password) => api.post(`/users/${id}/reset-password`, { password });
 
+export const checkCertEligibility = (examId) => api.get(`/certificates/check/${examId}`);
+export const downloadCertificate = (examId, submissionId) => api.get(`/certificates/download/${examId}/${submissionId}`, { responseType: 'blob' });
+export const previewCertificate = (examId) => api.get(`/certificates/preview/${examId}`, { responseType: 'blob' });
+
 export default api;

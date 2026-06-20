@@ -166,6 +166,12 @@ public class ExamService {
         if (details.getTargetAudience() != null) exam.setTargetAudience(details.getTargetAudience());
         if (details.getTargetIds() != null) exam.setTargetIds(details.getTargetIds());
 
+        // Update Certificate
+        if (details.getEnableCert() != null) exam.setEnableCert(details.getEnableCert());
+        if (details.getCertTitle() != null) exam.setCertTitle(details.getCertTitle());
+        if (details.getCertIssuer() != null) exam.setCertIssuer(details.getCertIssuer());
+        if (details.getCertPassScore() != null) exam.setCertPassScore(details.getCertPassScore());
+
         exam.setState("PUBLISHED");
         examRepository.save(exam);
 
@@ -313,6 +319,11 @@ public class ExamService {
         stats.setMinScore(min);
         stats.setPassRate((double) passCount / submissions.size() * 100);
         stats.setScoreDistribution(dist);
+
+        stats.setEnableCert(exam.getEnableCert());
+        stats.setCertTitle(exam.getCertTitle());
+        stats.setCertIssuer(exam.getCertIssuer());
+        stats.setCertPassScore(passScore);
         
         return stats;
     }
