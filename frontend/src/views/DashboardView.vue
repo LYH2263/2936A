@@ -3,13 +3,13 @@ import { ref, computed, onMounted, watch, h, shallowRef } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { useAuthStore } from '@/stores/auth';
 import { useConfigStore } from '@/stores/config';
-import { getExams, getMySubmissions, publishExam, deleteExam, getExamSubmissions, updateProfile, getSystemConfig, getStudentStats, getTeacherStats } from '@/api';
+import { getExams, getMySubmissions, publishExam, deleteExam, getExamSubmissions, updateProfile, getSystemConfig, getStudentStats, getTeacherStats, getPendingAppealCount } from '@/api';
 import { message } from 'ant-design-vue';
 import { 
   UserOutlined, LogoutOutlined, PlusOutlined, UnorderedListOutlined, 
   BankOutlined, ProfileOutlined, BookOutlined, TeamOutlined, FileTextOutlined,
   SettingOutlined, DashboardOutlined, TrophyOutlined, HourglassOutlined, ReadOutlined,
-  SearchOutlined, BarsOutlined
+  SearchOutlined, BarsOutlined, AlertOutlined
 } from '@ant-design/icons-vue';
 import CreateExamModal from '@/components/CreateExamModal.vue';
 import AddQuestionModal from '@/components/AddQuestionModal.vue';
@@ -53,7 +53,8 @@ watch(() => route.query.tab, (newTab) => {
   }
 });
 
-const loading = ref(false); // Added loading ref
+const loading = ref(false);
+const pendingAppealCount = ref(0);
 
 const checkNotifications = async () => {
   try {
@@ -130,6 +131,10 @@ const fetchData = async () => {
     } else if (authStore.isTeacher) {
       const tStatsRes = await getTeacherStats();
       teacherStats.value = tStatsRes.data;
+      try {
+        const appealRes = await getPendingAppealCount();
+        pendingAppealCount.value = appealRes.data.count || 0;
+      } catch (e) { /* ignore */ }
     }
   } catch (e) {
     console.error('Failed to fetch data', e);
@@ -149,6 +154,14 @@ const getExamStatus = (exam) => {
 };
 
 const handleMenuClick = ({ key }) => {
+  if (key === 'my-appeals') {
+    router.push('/appeals/student');
+    return;
+  }
+  if (key === 'appeal-review') {
+    router.push('/appeals/teacher');
+    return;
+  }
   activeTab.value = key;
   router.push({ path: '/dashboard', query: { tab: key } });
 };
@@ -336,6 +349,15 @@ const userInitial = computed(() => {
           <TrophyOutlined />
           <span>我的成绩</span>
         </a-menu-item>
+        <a-menu-item key="my-appeals" v-if="authStore.user?.role === 'STUDENT'">
+          <AlertOutlined />
+          <span>我的申诉</span>
+        </a-menu-item>
+        <a-menu-item key="appeal-review" v-if="authStore.isTeacher">
+          <AlertOutlined />
+          <span>申诉处理台</span>
+          <a-badge :count="pendingAppealCount" :overflow-count="99" style="margin-left: 8px;" v-if="pendingAppealCount > 0" />
+        </a-menu-item>
         <a-menu-item key="users" v-if="authStore.isTeacher || authStore.isAdmin">
           <TeamOutlined />
           <span>用户管理</span>
@@ -360,6 +382,8 @@ const userInitial = computed(() => {
               'manage': '试卷管理', 
               'hall': '考试大厅', 
               'scores': '我的成绩', 
+              'my-appeals': '我的申诉',
+              'appeal-review': '申诉处理台',
               'users': '用户管理', 
               'config': '系统设置', 
               'profile': '个人资料' 

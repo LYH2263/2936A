@@ -8,6 +8,8 @@ import ScoreDetailView from '@/views/ScoreDetailView.vue'
 import ExamAssembleView from '@/views/ExamAssembleView.vue'
 import ExamPublishView from '@/views/ExamPublishView.vue'
 import ExamAnalysisView from '@/views/ExamAnalysisView.vue'
+import AppealStudentView from '@/views/AppealStudentView.vue'
+import AppealTeacherView from '@/views/AppealTeacherView.vue'
 
 const router = createRouter({
     history: createWebHistory(import.meta.env.BASE_URL),
@@ -62,6 +64,18 @@ const router = createRouter({
             name: 'exam-analysis',
             component: ExamAnalysisView,
             meta: { requiresAuth: true }
+        },
+        {
+            path: '/appeals/student',
+            name: 'appeal-student',
+            component: AppealStudentView,
+            meta: { requiresAuth: true, role: 'STUDENT' }
+        },
+        {
+            path: '/appeals/teacher',
+            name: 'appeal-teacher',
+            component: AppealTeacherView,
+            meta: { requiresAuth: true, role: 'TEACHER' }
         }
     ]
 })

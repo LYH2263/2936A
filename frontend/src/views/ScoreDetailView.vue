@@ -1,21 +1,29 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { getSubmission, getExamQuestions } from '@/api';
+import { useAuthStore } from '@/stores/auth';
+import { getSubmission, getExamQuestions, submitAppeal, getMyAppeals } from '@/api';
 import { message } from 'ant-design-vue';
 import { 
   LeftOutlined, CheckCircleFilled, CloseCircleFilled, 
   InfoCircleOutlined, TrophyOutlined, ClockCircleOutlined,
-  CalendarOutlined, UserOutlined
+  CalendarOutlined, UserOutlined, AlertOutlined
 } from '@ant-design/icons-vue';
 
 const route = useRoute();
 const router = useRouter();
 const submissionId = route.params.id;
 
+const authStore = useAuthStore();
 const submission = ref(null);
 const questions = ref([]);
 const loading = ref(true);
+const existingAppeals = ref([]);
+const appealModalVisible = ref(false);
+const appealingAnswerId = ref(null);
+const appealingQuestionIndex = ref(null);
+const appealReason = ref('');
+const submittingAppeal = ref(false);
 
 const fetchData = async () => {
   try {
@@ -24,6 +32,13 @@ const fetchData = async () => {
     
     const qRes = await getExamQuestions(submission.value.exam.id);
     questions.value = qRes.data;
+
+    if (authStore.user?.role === 'STUDENT') {
+      try {
+        const appealRes = await getMyAppeals();
+        existingAppeals.value = appealRes.data;
+      } catch (e) { /* ignore */ }
+    }
   } catch (e) {
     message.error('获取成绩详情失败');
     router.push('/dashboard');
@@ -53,6 +68,60 @@ const getTeacherComment = (qId) => {
 const isCorrect = (qId, correctAns) => {
   const studentAns = getStudentAnswer(qId);
   return studentAns === correctAns;
+};
+
+const getAnswerByQuestionId = (qId) => {
+  if (!submission.value || !submission.value.answers) return null;
+  return submission.value.answers.find(a => (a.question.id || a.question) === qId);
+};
+
+const hasPendingAppeal = (qId) => {
+  const answer = getAnswerByQuestionId(qId);
+  if (!answer) return false;
+  return existingAppeals.value.some(a => a.answer?.id === answer.id && a.status === 'PENDING');
+};
+
+const getAppealStatus = (qId) => {
+  const answer = getAnswerByQuestionId(qId);
+  if (!answer) return null;
+  const appeal = existingAppeals.value.find(a => a.answer?.id === answer.id);
+  return appeal ? appeal.status : null;
+};
+
+const openAppealModal = (qId, questionIndex) => {
+  const answer = getAnswerByQuestionId(qId);
+  if (!answer) return;
+  appealingAnswerId.value = answer.id;
+  appealingQuestionIndex.value = questionIndex;
+  appealReason.value = '';
+  appealModalVisible.value = true;
+};
+
+const handleAppealSubmit = async () => {
+  if (!appealReason.value.trim()) {
+    message.warning('请填写申诉理由');
+    return;
+  }
+  if (appealReason.value.length > 500) {
+    message.warning('申诉理由不能超过500字');
+    return;
+  }
+  submittingAppeal.value = true;
+  try {
+    await submitAppeal({
+      submissionId: parseInt(submissionId),
+      answerId: appealingAnswerId.value,
+      reason: appealReason.value.trim()
+    });
+    message.success('申诉已提交');
+    appealModalVisible.value = false;
+    fetchData();
+  } catch (e) {
+    const msg = e.response?.data?.message || '提交申诉失败';
+    message.error(msg);
+  } finally {
+    submittingAppeal.value = false;
+  }
 };
 
 const formatDate = (dateStr) => {
@@ -112,6 +181,16 @@ onMounted(fetchData);
                      </template>
                      <span class="earned-score">得分: {{ getQuestionScore(q.question.id) }}</span>
                   </div>
+                  <template v-if="authStore.user?.role === 'STUDENT'">
+                    <a-button v-if="hasPendingAppeal(q.question.id)" type="link" size="small" disabled>
+                      <ClockCircleOutlined /> 申诉中
+                    </a-button>
+                    <a-tag v-else-if="getAppealStatus(q.question.id) === 'APPROVED'" color="green">申诉已通过</a-tag>
+                    <a-tag v-else-if="getAppealStatus(q.question.id) === 'REJECTED'" color="red">申诉已驳回</a-tag>
+                    <a-button v-else type="link" size="small" @click="openAppealModal(q.question.id, index + 1)">
+                      <AlertOutlined /> 申诉
+                    </a-button>
+                  </template>
                </div>
             </div>
 
@@ -182,6 +261,17 @@ onMounted(fetchData);
          <div class="footer-stamp">已阅</div>
       </div>
     </div>
+
+    <a-modal v-model:open="appealModalVisible" title="成绩申诉" :confirm-loading="submittingAppeal" @ok="handleAppealSubmit" ok-text="提交申诉" cancel-text="取消" width="520px">
+      <a-form layout="vertical">
+        <a-form-item label="申诉题目">
+          <span>第 {{ appealingQuestionIndex }} 题</span>
+        </a-form-item>
+        <a-form-item label="申诉理由" required>
+          <a-textarea v-model:value="appealReason" placeholder="请详细说明申诉理由，最多500字" :maxlength="500" :rows="4" show-count />
+        </a-form-item>
+      </a-form>
+    </a-modal>
 
     <div v-else-if="loading" class="loading-box">
        <a-spin size="large" tip="正在为您打印成绩单..." />

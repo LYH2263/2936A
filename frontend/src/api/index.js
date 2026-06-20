@@ -88,6 +88,12 @@ export const recordCheating = (examId, data) => api.post(`/exams/${examId}/recor
 export const getNotifications = () => api.get('/notifications');
 export const markNotificationRead = (id) => api.post(`/notifications/${id}/read`);
 
+export const submitAppeal = (data) => api.post('/appeals', data);
+export const getMyAppeals = () => api.get('/appeals/my');
+export const getPendingAppeals = () => api.get('/appeals/pending');
+export const getPendingAppealCount = () => api.get('/appeals/pending-count');
+export const processAppeal = (id, data) => api.post(`/appeals/${id}/process`, data);
+
 // User Management
 export const getUsers = (params) => api.get('/users', { params });
 export const createUser = (data) => api.post('/users', data);
