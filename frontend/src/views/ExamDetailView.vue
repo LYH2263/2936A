@@ -1,11 +1,12 @@
 <script setup>
-import { ref, onMounted, computed } from 'vue';
+import { ref, onMounted, computed, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { getExam, getExamQuestions } from '@/api';
+import { getExam, getExamQuestions, getStudentAnnouncements, getAnnouncementUnreadCount, markAnnouncementRead, markAllAnnouncementsRead } from '@/api';
 import { 
   ClockCircleOutlined, CalendarOutlined, BookOutlined, 
   LeftOutlined, SafetyCertificateOutlined, EyeOutlined,
-  CloudOutlined, InfoCircleOutlined
+  CloudOutlined, InfoCircleOutlined, NotificationOutlined,
+  PushpinFilled, CheckOutlined, BellFilled
 } from '@ant-design/icons-vue';
 import { message } from 'ant-design-vue';
 
@@ -16,6 +17,31 @@ const exam = ref(null);
 const loading = ref(true);
 const questions = ref([]);
 
+const announcements = ref([]);
+const announcementsLoading = ref(false);
+const unreadCount = ref(0);
+const panelActiveKeys = ref([]);
+
+const fetchAnnouncements = async () => {
+  if (!examId) return;
+  announcementsLoading.value = true;
+  try {
+    const [listRes, countRes] = await Promise.all([
+      getStudentAnnouncements(examId),
+      getAnnouncementUnreadCount(examId)
+    ]);
+    announcements.value = listRes.data;
+    unreadCount.value = countRes.data.count || 0;
+    if (unreadCount.value > 0) {
+      panelActiveKeys.value = ['announcements'];
+    }
+  } catch (e) {
+    console.error('加载公告失败', e);
+  } finally {
+    announcementsLoading.value = false;
+  }
+};
+
 const fetchData = async () => {
   try {
     const [eRes, qRes] = await Promise.all([
@@ -24,11 +50,41 @@ const fetchData = async () => {
     ]);
     exam.value = eRes.data;
     questions.value = qRes.data;
+    fetchAnnouncements();
   } catch (e) {
     message.error('加载考试信息失败');
     router.push('/dashboard');
   } finally {
     loading.value = false;
+  }
+};
+
+const handlePanelChange = (keys) => {
+  panelActiveKeys.value = keys;
+  if (keys?.includes('announcements') && unreadCount.value > 0) {
+    handleMarkAllRead();
+  }
+};
+
+const handleItemOpen = async (item) => {
+  if (!item.isRead) {
+    try {
+      await markAnnouncementRead(item.id);
+      item.isRead = true;
+      unreadCount.value = Math.max(0, unreadCount.value - 1);
+    } catch (e) {
+      console.error('标记已读失败', e);
+    }
+  }
+};
+
+const handleMarkAllRead = async () => {
+  try {
+    await markAllAnnouncementsRead(examId);
+    announcements.value.forEach(a => a.isRead = true);
+    unreadCount.value = 0;
+  } catch (e) {
+    console.error('全部标已读失败', e);
   }
 };
 
@@ -46,6 +102,8 @@ const status = computed(() => {
 const canStart = computed(() => status.value.allow);
 
 const totalScore = computed(() => questions.value.reduce((sum, q) => sum + (q.score || 0), 0));
+
+const formatTime = (t) => t ? new Date(t).toLocaleString() : '-';
 
 onMounted(fetchData);
 
@@ -65,6 +123,65 @@ const goBack = () => {
       <div class="back-link" @click="goBack">
         <LeftOutlined /> 返回列表
       </div>
+
+      <a-collapse
+        v-if="announcements.length > 0"
+        v-model:activeKey="panelActiveKeys"
+        class="announcement-collapse"
+        ghost
+        @change="handlePanelChange"
+      >
+        <a-collapse-panel key="announcements">
+          <template #header>
+            <div class="panel-header">
+              <BellFilled class="panel-icon" />
+              <span class="panel-title">考试公告</span>
+              <a-badge
+                v-if="unreadCount > 0"
+                :count="unreadCount"
+                :overflow-count="99"
+                class="unread-badge"
+              />
+              <span class="panel-count">({{ announcements.length }}条)</span>
+            </div>
+          </template>
+          <template #extra>
+            <a-button
+              v-if="unreadCount > 0"
+              type="link"
+              size="small"
+              @click.stop="handleMarkAllRead"
+            >
+              <CheckOutlined /> 全部标为已读
+            </a-button>
+          </template>
+
+          <a-spin :spinning="announcementsLoading">
+            <div class="announcement-list">
+              <div
+                v-for="item in announcements"
+                :key="item.id"
+                class="announcement-card"
+                :class="{ pinned: item.isPinned, unread: !item.isRead }"
+                @click="handleItemOpen(item)"
+              >
+                <div class="ann-header">
+                  <div class="ann-title-row">
+                    <span v-if="item.isPinned" class="pin-tag">
+                      <PushpinFilled /> 置顶
+                    </span>
+                    <span class="ann-title">{{ item.title }}</span>
+                    <span v-if="!item.isRead" class="unread-dot"></span>
+                  </div>
+                  <span class="ann-time">{{ formatTime(item.createdAt) }}</span>
+                </div>
+                <div class="ann-content" v-html="item.content"></div>
+              </div>
+              <a-empty v-if="announcements.length === 0" description="暂无公告" />
+            </div>
+          </a-spin>
+        </a-collapse-panel>
+      </a-collapse>
 
       <div class="hero-section">
         <div class="hero-left">
@@ -195,6 +312,142 @@ const goBack = () => {
   color: white;
   transform: translateX(-4px);
 }
+
+.announcement-collapse {
+  margin-bottom: 24px;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+  overflow: hidden;
+}
+.announcement-collapse :deep(.ant-collapse-header) {
+  padding: 16px 24px !important;
+  align-items: center !important;
+}
+.announcement-collapse :deep(.ant-collapse-content-box) {
+  padding: 0 24px 24px !important;
+}
+.panel-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.panel-icon {
+  color: #faad14;
+  font-size: 18px;
+}
+.panel-title {
+  font-weight: 600;
+  font-size: 16px;
+  color: #1a1a1a;
+}
+.unread-badge {
+  margin-left: 4px;
+}
+.panel-count {
+  color: #999;
+  font-size: 13px;
+  margin-left: 4px;
+}
+
+.announcement-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.announcement-card {
+  padding: 16px 20px;
+  border: 1px solid #f0f0f0;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s;
+  position: relative;
+}
+.announcement-card:hover {
+  border-color: #bae7ff;
+  box-shadow: 0 2px 8px rgba(24, 144, 255, 0.1);
+}
+.announcement-card.pinned {
+  background: linear-gradient(135deg, #fffbe6 0%, #fff 100%);
+  border-color: #ffe58f;
+}
+.announcement-card.unread {
+  border-left: 4px solid #f5222d;
+  padding-left: 16px;
+}
+.ann-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 10px;
+}
+.ann-title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+}
+.pin-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 8px;
+  background: #faad14;
+  color: white;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.ann-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #1a1a1a;
+}
+.unread-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #f5222d;
+  flex-shrink: 0;
+  animation: pulse-dot 1.5s infinite;
+}
+.ann-time {
+  font-size: 12px;
+  color: #999;
+  flex-shrink: 0;
+  margin-left: 12px;
+}
+.ann-content {
+  line-height: 1.8;
+  color: #444;
+  font-size: 14px;
+  overflow-wrap: break-word;
+}
+.ann-content :deep(h1),
+.ann-content :deep(h2),
+.ann-content :deep(h3) {
+  margin: 12px 0 8px;
+  font-weight: 600;
+}
+.ann-content :deep(ul),
+.ann-content :deep(ol) {
+  padding-left: 24px;
+  margin: 8px 0;
+}
+.ann-content :deep(p) {
+  margin: 8px 0;
+}
+.ann-content :deep(img) {
+  max-width: 100%;
+  border-radius: 6px;
+}
+
+@keyframes pulse-dot {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.3); opacity: 0.7; }
+}
+
 .hero-section {
   display: flex;
   background: white;

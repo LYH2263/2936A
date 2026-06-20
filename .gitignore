@@ -3,3 +3,39 @@
 迭代.md
 代码生成.md
 对话/
+
+# 依赖
+node_modules/
+
+# 前端构建产物
+frontend/dist/
+dist/
+
+# 后端构建产物（Maven）
+backend/target/
+target/
+
+# 环境变量（保留 .env.example）
+.env
+.env.local
+.env.*.local
+backend/.env
+frontend/.env
+
+# IDE
+.idea/
+*.iml
+.vscode/
+*.swp
+*.swo
+
+# 日志与临时文件
+*.log
+logs/
+tmp/
+temp/
+
+# 操作系统
+.DS_Store
+Thumbs.db
+Desktop.ini

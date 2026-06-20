@@ -22,6 +22,8 @@ import UserManagementView from '@/views/UserManagementView.vue';
 import { getNotifications, markNotificationRead } from '@/api';
 import { notification, Button as AButton } from 'ant-design-vue';
 import SystemConfigView from '@/views/SystemConfigView.vue';
+import AnnouncementManageModal from '@/components/AnnouncementManageModal.vue';
+import { NotificationOutlined } from '@ant-design/icons-vue';
 
 const router = useRouter();
 const route = useRoute();
@@ -106,6 +108,7 @@ const autoGenerateVisible = ref(false);
 const editorVisible = ref(false);
 const publishVisible = ref(false);
 const gradeVisible = ref(false);
+const announcementVisible = ref(false);
 const currentExamId = ref(null);
 const currentExam = ref(null);
 const currentSubmissionId = ref(null);
@@ -287,6 +290,12 @@ const handleDelete = async (examId) => {
   } catch (e) {
     message.error('删除失败');
   }
+};
+
+const showAnnouncementManage = (exam) => {
+  currentExamId.value = exam.id;
+  currentExam.value = exam;
+  announcementVisible.value = true;
 };
 
 // Profile editing
@@ -618,6 +627,11 @@ const handleCertTooltip = (sub) => {
                    <a-divider type="vertical" />
                    <a-button type="link" size="small" :disabled="record.state === 'PUBLISHED'" @click="handlePublish(record)">发布</a-button>
                    <a-divider type="vertical" />
+                   <a-button type="link" size="small" @click="showAnnouncementManage(record)">
+                     <template #icon><NotificationOutlined /></template>
+                     公告管理
+                   </a-button>
+                   <a-divider type="vertical" />
                    <a-popconfirm title="确定删除吗？将删除所有相关答题记录。" @confirm="handleDelete(record.id)">
                      <a-button type="link" size="small" danger>删除</a-button>
                    </a-popconfirm>
@@ -856,6 +870,13 @@ const handleCertTooltip = (sub) => {
       v-model:open="gradeVisible" 
       :submissionId="currentSubmissionId"
       @graded="onGraded"
+    />
+
+    <AnnouncementManageModal
+      v-model:open="announcementVisible"
+      :examId="currentExamId"
+      :examState="currentExam?.state"
+      @success="fetchData"
     />
 
     </a-layout>

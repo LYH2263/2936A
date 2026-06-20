@@ -116,4 +116,15 @@ export const checkCertEligibility = (examId) => api.get(`/certificates/check/${e
 export const downloadCertificate = (examId, submissionId) => api.get(`/certificates/download/${examId}/${submissionId}`, { responseType: 'blob' });
 export const previewCertificate = (examId) => api.get(`/certificates/preview/${examId}`, { responseType: 'blob' });
 
+// Exam Announcements
+export const getTeacherAnnouncements = (examId) => api.get(`/exams/${examId}/announcements`);
+export const createAnnouncement = (examId, data) => api.post(`/exams/${examId}/announcements`, data);
+export const updateAnnouncement = (announcementId, data) => api.put(`/exams/announcements/${announcementId}`, data);
+export const toggleAnnouncementPin = (announcementId) => api.post(`/exams/announcements/${announcementId}/toggle-pin`);
+export const deleteAnnouncement = (announcementId) => api.delete(`/exams/announcements/${announcementId}`);
+export const getStudentAnnouncements = (examId) => api.get(`/exams/${examId}/announcements/student`);
+export const getAnnouncementUnreadCount = (examId) => api.get(`/exams/${examId}/announcements/unread-count`);
+export const markAnnouncementRead = (announcementId) => api.post(`/exams/announcements/${announcementId}/read`);
+export const markAllAnnouncementsRead = (examId) => api.post(`/exams/${examId}/announcements/read-all`);
+
 export default api;
