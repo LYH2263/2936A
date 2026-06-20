@@ -1,8 +1,8 @@
 <script setup>
 import { ref, watch, computed } from 'vue';
-import { getSubmission, gradeSubmission, getExamQuestions } from '@/api';
+import { getSubmission, gradeSubmission, getExamQuestions, getCommentTemplates } from '@/api';
 import { message } from 'ant-design-vue';
-import { CheckCircleOutlined, CloseCircleOutlined } from '@ant-design/icons-vue';
+import { CheckCircleOutlined, CloseCircleOutlined, FormOutlined } from '@ant-design/icons-vue';
 
 const props = defineProps(['open', 'submissionId']);
 const emit = defineEmits(['update:open', 'graded']);
@@ -11,6 +11,8 @@ const loading = ref(false);
 const submission = ref(null);
 const questions = ref([]);
 const grades = ref({}); // { questionId: { score, teacherComment } }
+const commentTemplates = ref([]);
+const templateLoading = ref(false);
 
 const fetchData = async () => {
   if (!props.submissionId) return;
@@ -21,6 +23,8 @@ const fetchData = async () => {
     
     const qRes = await getExamQuestions(submission.value.exam.id);
     questions.value = qRes.data;
+    
+    fetchCommentTemplates();
     
     // Initialize grades state
     const currentGrades = {};
@@ -37,6 +41,29 @@ const fetchData = async () => {
   } finally {
     loading.value = false;
   }
+};
+
+const fetchCommentTemplates = async () => {
+  templateLoading.value = true;
+  try {
+    const res = await getCommentTemplates();
+    commentTemplates.value = res.data;
+  } catch (e) {
+    // Don't show error for templates - it's not critical
+    console.warn('加载评语模板失败', e);
+  } finally {
+    templateLoading.value = false;
+  }
+};
+
+const insertTemplate = (qId, templateId) => {
+  const tpl = commentTemplates.value.find(t => t.id === templateId);
+  if (!tpl) return;
+  const current = grades.value[qId]?.teacherComment || '';
+  if (!grades.value[qId]) {
+    grades.value[qId] = { score: null, teacherComment: '' };
+  }
+  grades.value[qId].teacherComment = current ? current + ' ' + tpl.content : tpl.content;
 };
 
 watch(() => props.open, (newVal) => {
@@ -138,8 +165,28 @@ const getStatusColor = (sa) => {
                 />
               </a-col>
               <a-col :span="18">
-                <div class="label">评语:</div>
-                <a-input v-model:value="grades[qItem.question.id].teacherComment" placeholder="输入评语..." />
+                <div class="label-row">
+                  <span class="label">评语:</span>
+                  <a-select
+                    v-if="!isObjective(qItem.question.type)"
+                    :loading="templateLoading"
+                    style="width: 200px; margin-left: auto;"
+                    placeholder="插入模板..."
+                    value=""
+                    allowClear
+                    :options="commentTemplates.map(t => ({ 
+                      value: String(t.id), 
+                      label: t.name + (t.subject ? `（${t.subject}）` : '') + (t.isPublic ? ' [公共]' : '')
+                    }))"
+                    @change="(val) => { if (val) insertTemplate(qItem.question.id, Number(val)); }"
+                  >
+                    <template #suffixIcon><FormOutlined /></template>
+                  </a-select>
+                </div>
+                <a-input 
+                  v-model:value="grades[qItem.question.id].teacherComment" 
+                  placeholder="输入评语，或从上方选择模板快速插入..." 
+                />
               </a-col>
             </a-row>
           </div>
@@ -197,5 +244,9 @@ const getStatusColor = (sa) => {
   font-size: 12px;
   color: #1890ff;
   margin-bottom: 4px;
+}
+.label-row {
+  display: flex;
+  align-items: center;
 }
 </style>

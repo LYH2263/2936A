@@ -3,14 +3,14 @@ import { ref, computed, onMounted, watch, h, shallowRef } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { useAuthStore } from '@/stores/auth';
 import { useConfigStore } from '@/stores/config';
-import { getExams, getMySubmissions, publishExam, deleteExam, getExamSubmissions, updateProfile, getSystemConfig, getStudentStats, getTeacherStats, getPendingAppealCount, getPendingFeedbackCount, checkCertEligibility, downloadCertificate, getStudyPlanDashboard } from '@/api';
+import { getExams, getMySubmissions, publishExam, deleteExam, getExamSubmissions, updateProfile, getSystemConfig, getStudentStats, getTeacherStats, getPendingAppealCount, getPendingFeedbackCount, checkCertEligibility, downloadCertificate, getStudyPlanDashboard, getCommentTemplates, createCommentTemplate, updateCommentTemplate, deleteCommentTemplate } from '@/api';
 import { message } from 'ant-design-vue';
 import { 
   UserOutlined, LogoutOutlined, PlusOutlined, UnorderedListOutlined, 
   BankOutlined, ProfileOutlined, BookOutlined, TeamOutlined, FileTextOutlined,
   SettingOutlined, DashboardOutlined, TrophyOutlined, HourglassOutlined, ReadOutlined,
   SearchOutlined, BarsOutlined, AlertOutlined, SafetyCertificateOutlined, DownloadOutlined,
-  FlagOutlined, FireOutlined
+  FlagOutlined, FireOutlined, FormOutlined, EditOutlined, DeleteOutlined, GlobalOutlined
 } from '@ant-design/icons-vue';
 import CreateExamModal from '@/components/CreateExamModal.vue';
 import AddQuestionModal from '@/components/AddQuestionModal.vue';
@@ -114,6 +114,17 @@ const editorVisible = ref(false);
 const publishVisible = ref(false);
 const gradeVisible = ref(false);
 const announcementVisible = ref(false);
+const commentTemplateModalVisible = ref(false);
+const commentTemplateEditing = ref(null);
+const commentTemplateForm = ref({
+  name: '',
+  content: '',
+  subject: '',
+  isPublic: false
+});
+const commentTemplates = ref([]);
+const commentTemplateLoading = ref(false);
+const commentTemplateSaving = ref(false);
 const currentExamId = ref(null);
 const currentExam = ref(null);
 const currentSubmissionId = ref(null);
@@ -185,8 +196,82 @@ const handleMenuClick = ({ key }) => {
     router.push('/feedbacks/teacher');
     return;
   }
+  if (key === 'comment-templates') {
+    fetchCommentTemplates();
+  }
   activeTab.value = key;
   router.push({ path: '/dashboard', query: { tab: key } });
+};
+
+const fetchCommentTemplates = async () => {
+  commentTemplateLoading.value = true;
+  try {
+    const res = await getCommentTemplates();
+    commentTemplates.value = res.data;
+  } catch (e) {
+    message.error('加载评语模板失败');
+  } finally {
+    commentTemplateLoading.value = false;
+  }
+};
+
+const openCreateCommentTemplate = () => {
+  commentTemplateEditing.value = null;
+  commentTemplateForm.value = {
+    name: '',
+    content: '',
+    subject: '',
+    isPublic: false
+  };
+  commentTemplateModalVisible.value = true;
+};
+
+const openEditCommentTemplate = (tpl) => {
+  commentTemplateEditing.value = tpl;
+  commentTemplateForm.value = {
+    name: tpl.name,
+    content: tpl.content,
+    subject: tpl.subject || '',
+    isPublic: tpl.isPublic || false
+  };
+  commentTemplateModalVisible.value = true;
+};
+
+const handleSaveCommentTemplate = async () => {
+  if (!commentTemplateForm.value.name?.trim()) {
+    message.warning('请输入模板名称');
+    return;
+  }
+  if (!commentTemplateForm.value.content?.trim()) {
+    message.warning('请输入模板内容');
+    return;
+  }
+  commentTemplateSaving.value = true;
+  try {
+    if (commentTemplateEditing.value) {
+      await updateCommentTemplate(commentTemplateEditing.value.id, commentTemplateForm.value);
+      message.success('模板已更新');
+    } else {
+      await createCommentTemplate(commentTemplateForm.value);
+      message.success('模板已创建');
+    }
+    commentTemplateModalVisible.value = false;
+    fetchCommentTemplates();
+  } catch (e) {
+    message.error('保存失败');
+  } finally {
+    commentTemplateSaving.value = false;
+  }
+};
+
+const handleDeleteCommentTemplate = async (id) => {
+  try {
+    await deleteCommentTemplate(id);
+    message.success('已删除');
+    fetchCommentTemplates();
+  } catch (e) {
+    message.error('删除失败');
+  }
 };
 
 const filteredExams = computed(() => {
@@ -449,6 +534,10 @@ const refreshStudyPlans = async () => {
           <span>纠错工单</span>
           <a-badge :count="pendingFeedbackCount" :overflow-count="99" style="margin-left: 8px;" v-if="pendingFeedbackCount > 0" />
         </a-menu-item>
+        <a-menu-item key="comment-templates" v-if="authStore.isTeacher">
+          <FormOutlined />
+          <span>评语模板</span>
+        </a-menu-item>
         <a-menu-item key="users" v-if="authStore.isTeacher || authStore.isAdmin">
           <TeamOutlined />
           <span>用户管理</span>
@@ -476,6 +565,7 @@ const refreshStudyPlans = async () => {
               'my-appeals': '我的申诉',
               'appeal-review': '申诉处理台',
               'feedback-review': '纠错工单',
+              'comment-templates': '评语模板',
               'users': '用户管理', 
               'config': '系统设置', 
               'profile': '个人资料' 
@@ -881,6 +971,72 @@ const refreshStudyPlans = async () => {
               </a-card>
           </div>
 
+          <!-- COMMENT TEMPLATES -->
+          <div v-if="activeTab === 'comment-templates'">
+             <a-card title="评语模板库" :loading="commentTemplateLoading">
+               <template #extra>
+                 <a-button type="primary" @click="openCreateCommentTemplate">
+                   <PlusOutlined /> 新建模板
+                 </a-button>
+               </template>
+               
+               <a-alert 
+                 v-if="authStore.isAdmin" 
+                 message="管理员提示" 
+                 description="您可以设置「公共模板」，所有教师均可查看和使用。" 
+                 type="info" 
+                 show-icon 
+                 style="margin-bottom: 16px;"
+               />
+
+               <a-table :dataSource="commentTemplates" :pagination="{ pageSize: 10 }" :columns="[
+                 { title: 'ID', dataIndex: 'id', key: 'id', width: 70 },
+                 { title: '模板名称', dataIndex: 'name', key: 'name' },
+                 { title: '所属科目', dataIndex: 'subject', key: 'subject', customRender: ({text}) => text || '未分类' },
+                 { 
+                   title: '内容预览', 
+                   dataIndex: 'content', 
+                   key: 'content',
+                   customRender: ({text}) => text && text.length > 60 ? text.substring(0, 60) + '...' : (text || '-')
+                 },
+                 { 
+                   title: '类型', 
+                   key: 'type', 
+                   width: 120,
+                   customRender: ({record}) => (
+                     record.isPublic 
+                       ? h('span', null, [h('a-tag', { color: 'blue' }, '公共模板'), h('span', { style: 'margin-left: 4px; font-size: 12px; color: #999;' }, (record.teacher?.fullName || record.teacher?.username || '系统'))])
+                       : h('span', null, [h('a-tag', { color: 'default' }, '私有模板'), h('span', { style: 'margin-left: 4px; font-size: 12px; color: #999;' }, (record.teacher?.fullName || record.teacher?.username || '-'))])
+                   )
+                 },
+                 { title: '更新时间', dataIndex: 'updatedAt', key: 'updatedAt', width: 170, customRender: ({text}) => text ? new Date(text).toLocaleString() : '-' },
+                 { title: '操作', key: 'action', width: 180 }
+               ]">
+                 <template #bodyCell="{ column, record }">
+                   <template v-if="column.key === 'action'">
+                     <a-space>
+                       <template v-if="(record.teacher && record.teacher.id === authStore.user?.id) || authStore.isAdmin">
+                         <a-button type="link" size="small" @click="openEditCommentTemplate(record)">
+                           <EditOutlined /> 编辑
+                         </a-button>
+                         <a-popconfirm title="确定删除此模板？" @confirm="handleDeleteCommentTemplate(record.id)">
+                           <a-button type="link" size="small" danger>
+                             <DeleteOutlined /> 删除
+                           </a-button>
+                         </a-popconfirm>
+                       </template>
+                       <template v-else>
+                         <span style="color: #ccc;">仅创建者可操作</span>
+                       </template>
+                     </a-space>
+                   </template>
+                 </template>
+               </a-table>
+
+               <a-empty v-if="commentTemplates.length === 0 && !commentTemplateLoading" description="暂无模板，点击右上角「新建模板」开始创建" />
+             </a-card>
+          </div>
+
           <!-- SYSTEM CONFIG -->
           <div v-if="activeTab === 'config'">
              <SystemConfigView />
@@ -946,6 +1102,38 @@ const refreshStudyPlans = async () => {
       :examTitle="studyPlanExamTitle"
       @created="refreshStudyPlans"
     />
+
+    <!-- Comment Template Modal -->
+    <a-modal
+      v-model:open="commentTemplateModalVisible"
+      :title="commentTemplateEditing ? '编辑评语模板' : '新建评语模板'"
+      @ok="handleSaveCommentTemplate"
+      ok-text="保存"
+      cancel-text="取消"
+      :confirmLoading="commentTemplateSaving"
+      width="600px"
+    >
+      <a-form :model="commentTemplateForm" layout="vertical">
+        <a-form-item label="模板名称" required>
+          <a-input v-model:value="commentTemplateForm.name" placeholder="例如：满分评语" maxlength="50" />
+        </a-form-item>
+        <a-form-item label="所属科目" help="可按科目分类筛选模板">
+          <a-input v-model:value="commentTemplateForm.subject" placeholder="例如：语文、数学、英语..." maxlength="20" />
+        </a-form-item>
+        <a-form-item label="评语内容" required>
+          <a-textarea 
+            v-model:value="commentTemplateForm.content" 
+            placeholder="请输入评语内容..."
+            :rows="6"
+            :maxlength="500"
+            show-count
+          />
+        </a-form-item>
+        <a-form-item v-if="authStore.isAdmin" label="设为公共模板" help="公共模板对所有教师可见">
+          <a-switch v-model:checked="commentTemplateForm.isPublic" checked-children="是" un-checked-children="否" />
+        </a-form-item>
+      </a-form>
+    </a-modal>
 
     </a-layout>
   </a-layout>

@@ -368,7 +368,7 @@ onMounted(fetchData);
       </a-form>
     </a-modal>
 
-    <div v-else-if="loading" class="loading-box">
+    <div v-if="loading && !submission" class="loading-box">
        <a-spin size="large" tip="正在为您打印成绩单..." />
     </div>
   </div>

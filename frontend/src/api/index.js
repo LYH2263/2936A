@@ -136,4 +136,13 @@ export const checkInStudyPlanTask = (planId, data) => api.post(`/study-plans/${p
 export const addStudyPlanTask = (planId, data) => api.post(`/study-plans/${planId}/tasks`, data);
 export const deleteStudyPlanTask = (planId, taskId) => api.delete(`/study-plans/${planId}/tasks/${taskId}`);
 
+// Comment Templates
+export const getCommentTemplates = (subject) => api.get('/comment-templates', { params: subject ? { subject } : {} });
+export const getMyCommentTemplates = () => api.get('/comment-templates/my');
+export const getPublicCommentTemplates = () => api.get('/comment-templates/public');
+export const getCommentTemplate = (id) => api.get(`/comment-templates/${id}`);
+export const createCommentTemplate = (data) => api.post('/comment-templates', data);
+export const updateCommentTemplate = (id, data) => api.put(`/comment-templates/${id}`, data);
+export const deleteCommentTemplate = (id) => api.delete(`/comment-templates/${id}`);
+
 export default api;
