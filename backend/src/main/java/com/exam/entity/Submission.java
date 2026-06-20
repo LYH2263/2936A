@@ -33,6 +33,8 @@ public class Submission {
 
     private Integer tabSwitchCount = 0;
 
+    private LocalDateTime lastActiveTime;
+
     @Column(columnDefinition = "TEXT")
     private String cheatingLogs;
 

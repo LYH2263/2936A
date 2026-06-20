@@ -10,7 +10,8 @@ import {
   SettingOutlined, DashboardOutlined, TrophyOutlined, HourglassOutlined, ReadOutlined,
   SearchOutlined, BarsOutlined, AlertOutlined, SafetyCertificateOutlined, DownloadOutlined,
   FlagOutlined, FireOutlined, FormOutlined, EditOutlined, DeleteOutlined, GlobalOutlined,
-  AppstoreOutlined, ClockCircleOutlined, SecurityScanOutlined, ThunderboltOutlined
+  AppstoreOutlined, ClockCircleOutlined, SecurityScanOutlined, ThunderboltOutlined,
+  DesktopOutlined
 } from '@ant-design/icons-vue';
 import CreateExamModal from '@/components/CreateExamModal.vue';
 import AddQuestionModal from '@/components/AddQuestionModal.vue';
@@ -353,6 +354,10 @@ const showQuestionBank = (examId) => {
 
 const showAnalysis = (examId) => {
   router.push(`/exam/${examId}/analysis`);
+};
+
+const goToProctor = (examId) => {
+  router.push(`/proctor/${examId}`);
 };
 
 const showEditor = (examId) => {
@@ -882,6 +887,11 @@ const refreshStudyPlans = async () => {
                    </a-popconfirm>
                    <a-divider type="vertical" />
                    <a-button type="link" size="small" @click="showAnalysis(record.id)">数据分析</a-button>
+                   <a-divider type="vertical" />
+                   <a-button type="link" size="small" :disabled="record.state !== 'PUBLISHED'" @click="goToProctor(record.id)">
+                     <template #icon><DesktopOutlined /></template>
+                     监考大屏
+                   </a-button>
                    <a-divider type="vertical" />
                     <a-button type="link" size="small" @click="showSubmissions(record.id)">阅卷中心</a-button>
                     <a-divider type="vertical" />

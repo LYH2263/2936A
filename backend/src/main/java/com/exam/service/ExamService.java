@@ -426,6 +426,8 @@ public class ExamService {
             submission.setTabSwitchCount(submission.getTabSwitchCount() + 1);
         }
 
+        submission.setLastActiveTime(java.time.LocalDateTime.now());
+
         String logEntry = String.format("[%s] %s: %s", java.time.LocalDateTime.now(), type, detail);
         if (submission.getCheatingLogs() == null) {
             submission.setCheatingLogs(logEntry);
@@ -434,5 +436,17 @@ public class ExamService {
         }
         
         submissionRepository.save(submission);
+    }
+
+    @Transactional
+    public void updateHeartbeat(Long examId, String username) {
+        Submission submission = (submissionRepository.findByExamIdAndStudentUsername(examId, username))
+                .stream().filter(s -> "IN_PROGRESS".equals(s.getState())).findFirst()
+                .orElse(null);
+        
+        if (submission != null) {
+            submission.setLastActiveTime(java.time.LocalDateTime.now());
+            submissionRepository.save(submission);
+        }
     }
 }

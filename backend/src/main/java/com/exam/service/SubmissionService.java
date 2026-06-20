@@ -32,14 +32,51 @@ public class SubmissionService {
     }
 
     @Transactional
-    public Submission submitExam(Long examId, Map<Long, String> answers, String username) {
+    public Submission startExam(Long examId, String username) {
         User student = userRepository.findByUsername(username).orElseThrow();
         Exam exam = examRepository.findById(examId).orElseThrow();
+        
+        List<Submission> existing = submissionRepository.findByExamIdAndStudentUsername(examId, username);
+        Submission inProgress = existing.stream()
+                .filter(s -> "IN_PROGRESS".equals(s.getState()))
+                .findFirst()
+                .orElse(null);
+        
+        if (inProgress != null) {
+            inProgress.setLastActiveTime(LocalDateTime.now());
+            return submissionRepository.save(inProgress);
+        }
         
         Submission submission = new Submission();
         submission.setExam(exam);
         submission.setStudent(student);
-        submission.setStartTime(LocalDateTime.now().minusMinutes(30)); // Mock start time
+        submission.setStartTime(LocalDateTime.now());
+        submission.setLastActiveTime(LocalDateTime.now());
+        submission.setState("IN_PROGRESS");
+        submission.setTabSwitchCount(0);
+        
+        return submissionRepository.save(submission);
+    }
+
+    @Transactional
+    public Submission submitExam(Long examId, Map<Long, String> answers, String username) {
+        User student = userRepository.findByUsername(username).orElseThrow();
+        Exam exam = examRepository.findById(examId).orElseThrow();
+        
+        List<Submission> existing = submissionRepository.findByExamIdAndStudentUsername(examId, username);
+        Submission submission = existing.stream()
+                .filter(s -> "IN_PROGRESS".equals(s.getState()))
+                .findFirst()
+                .orElse(null);
+        
+        if (submission == null) {
+            submission = new Submission();
+            submission.setExam(exam);
+            submission.setStudent(student);
+            submission.setStartTime(LocalDateTime.now());
+            submission.setTabSwitchCount(0);
+        }
+        
         submission.setEndTime(LocalDateTime.now());
         submission.setState("SUBMITTED");
         

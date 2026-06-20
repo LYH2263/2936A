@@ -11,4 +11,6 @@ public interface ExamQuestionRepository extends JpaRepository<ExamQuestion, Long
     Integer sumScoreByExamId(@org.springframework.data.repository.query.Param("examId") Long examId);
 
     List<ExamQuestion> findByQuestionId(Long questionId);
+
+    int countByExamId(Long examId);
 }

@@ -1,7 +1,7 @@
 <script setup>
-import { ref, onMounted, onUnmounted, computed, watch } from 'vue';
+import { ref, onMounted, onUnmounted, computed, watch, nextTick } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { getExam, getExamQuestions, submitExam, getSubmission, recordCheating } from '@/api';
+import { getExam, getExamQuestions, submitExam, getSubmission, recordCheating, startExam, heartbeat } from '@/api';
 import { useAuthStore } from '@/stores/auth';
 import { useConfigStore } from '@/stores/config';
 import { message, Modal, notification } from 'ant-design-vue';
@@ -127,6 +127,7 @@ watch(answers, (newVal) => {
       savedAnswers: newVal,
       savedFlagged: Array.from(flagged.value)
     }));
+    sendHeartbeat();
   }
 }, { deep: true });
 
@@ -304,6 +305,8 @@ const initLockdown = () => {
 };
 
 const snapshotInterval = ref(null);
+const heartbeatInterval = ref(null);
+
 const takeSnapshot = () => {
     if (!videoRef.value || !stream.value) return;
     
@@ -317,8 +320,26 @@ const takeSnapshot = () => {
     recordCheatingEvent('SNAPSHOT', 'Periodic camera snapshot captured');
 };
 
+const sendHeartbeat = async () => {
+    if (!isAnalysis.value && exam.value) {
+        try {
+            await heartbeat(examId);
+        } catch (e) {
+            console.error('Heartbeat failed', e);
+        }
+    }
+};
+
 onMounted(() => {
-  fetchData().then(() => {
+  fetchData().then(async () => {
+      if (!isAnalysis.value) {
+          try {
+              await startExam(examId);
+          } catch (e) {
+              console.error('Failed to start exam', e);
+          }
+          heartbeatInterval.value = setInterval(sendHeartbeat, 30000);
+      }
       // Initialize lockdown after data is loaded and DOM is ready
       nextTick(() => {
           initLockdown();
@@ -332,6 +353,7 @@ onMounted(() => {
 onUnmounted(() => {
   clearInterval(timer.value);
   clearInterval(snapshotInterval.value);
+  clearInterval(heartbeatInterval.value);
   document.removeEventListener('visibilitychange', handleVisibilityChange);
   
   const canvas = document.querySelector('.question-canvas');

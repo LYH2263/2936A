@@ -157,4 +157,10 @@ export const submitFlashAnswer = (sessionId, data) => api.post(`/flash-practice/
 export const endFlashSession = (sessionId) => api.post(`/flash-practice/${sessionId}/end`);
 export const getFlashSession = (sessionId) => api.get(`/flash-practice/${sessionId}`);
 
+export const startExam = (examId) => api.post(`/submissions/${examId}/start`);
+export const heartbeat = (examId) => api.post(`/exams/${examId}/heartbeat`);
+
+export const getProctorData = (examId) => api.get(`/proctor/${examId}`);
+export const exportProctorSnapshot = (examId) => api.get(`/proctor/${examId}/export`, { responseType: 'blob' });
+
 export default api;

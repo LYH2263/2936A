@@ -12,6 +12,7 @@ import AppealStudentView from '@/views/AppealStudentView.vue'
 import AppealTeacherView from '@/views/AppealTeacherView.vue'
 import FeedbackTeacherView from '@/views/FeedbackTeacherView.vue'
 import FlashPracticeView from '@/views/FlashPracticeView.vue'
+import ProctorView from '@/views/ProctorView.vue'
 
 const router = createRouter({
     history: createWebHistory(import.meta.env.BASE_URL),
@@ -90,6 +91,12 @@ const router = createRouter({
             name: 'flash-practice',
             component: FlashPracticeView,
             meta: { requiresAuth: true, role: 'STUDENT' }
+        },
+        {
+            path: '/proctor/:examId',
+            name: 'proctor',
+            component: ProctorView,
+            meta: { requiresAuth: true, role: 'TEACHER' }
         }
     ]
 })
@@ -98,6 +105,17 @@ router.beforeEach((to, from, next) => {
     const authStore = useAuthStore()
     if (to.meta.requiresAuth && !authStore.isAuthenticated) {
         next('/login')
+    } else if (to.meta.role) {
+        const requiredRole = to.meta.role
+        if (requiredRole === 'TEACHER' && !authStore.isTeacher) {
+            next('/dashboard')
+        } else if (requiredRole === 'STUDENT' && authStore.user?.role !== 'STUDENT') {
+            next('/dashboard')
+        } else if (requiredRole === 'ADMIN' && !authStore.isAdmin) {
+            next('/dashboard')
+        } else {
+            next()
+        }
     } else {
         next()
     }

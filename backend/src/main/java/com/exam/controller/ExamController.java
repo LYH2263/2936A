@@ -134,4 +134,10 @@ public class ExamController {
         examService.recordCheatingEvent(examId, principal.getName(), type, detail);
         return ResponseEntity.ok().build();
     }
+
+    @PostMapping("/{examId}/heartbeat")
+    public ResponseEntity<?> heartbeat(@PathVariable Long examId, Principal principal) {
+        examService.updateHeartbeat(examId, principal.getName());
+        return ResponseEntity.ok().build();
+    }
 }
