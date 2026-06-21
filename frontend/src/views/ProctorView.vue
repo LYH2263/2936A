@@ -44,8 +44,12 @@ const fetchProctorData = async () => {
   } catch (e) {
     console.error('Failed to fetch proctor data', e);
     if (e.response?.status === 403) {
-      message.error('无权访问此监考页面');
-      router.push('/dashboard');
+      const errMsg = e.response?.data?.message || '无权访问此监考页面，仅考试创建者或ADMIN可查看';
+      message.error(errMsg);
+      if (pollingInterval.value) {
+        clearInterval(pollingInterval.value);
+      }
+      setTimeout(() => router.push('/dashboard'), 1500);
     }
   } finally {
     loading.value = false;

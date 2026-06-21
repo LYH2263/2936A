@@ -2,9 +2,11 @@ package com.exam.service;
 
 import com.exam.entity.Exam;
 import com.exam.entity.Submission;
+import com.exam.entity.SubmissionAnswer;
 import com.exam.entity.User;
 import com.exam.repository.ExamRepository;
 import com.exam.repository.ExamQuestionRepository;
+import com.exam.repository.SubmissionAnswerRepository;
 import com.exam.repository.SubmissionRepository;
 import com.exam.repository.UserRepository;
 import com.exam.dto.ProctorStudentDTO;
@@ -15,7 +17,10 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 public class ProctorService {
@@ -23,16 +28,18 @@ public class ProctorService {
     private final SubmissionRepository submissionRepository;
     private final ExamQuestionRepository examQuestionRepository;
     private final UserRepository userRepository;
+    private final SubmissionAnswerRepository submissionAnswerRepository;
 
     private static final long INACTIVITY_THRESHOLD_MINUTES = 5;
-    private static final int TAB_SWITCH_EXCESS_THRESHOLD = 5;
 
     public ProctorService(ExamRepository examRepository, SubmissionRepository submissionRepository, 
-                          ExamQuestionRepository examQuestionRepository, UserRepository userRepository) {
+                          ExamQuestionRepository examQuestionRepository, UserRepository userRepository,
+                          SubmissionAnswerRepository submissionAnswerRepository) {
         this.examRepository = examRepository;
         this.submissionRepository = submissionRepository;
         this.examQuestionRepository = examQuestionRepository;
         this.userRepository = userRepository;
+        this.submissionAnswerRepository = submissionAnswerRepository;
     }
 
     public boolean canAccessProctor(Long examId, String username) {
@@ -55,11 +62,16 @@ public class ProctorService {
         
         int totalQuestions = examQuestionRepository.countByExamId(examId);
         
+        List<SubmissionAnswer> allAnswers = submissionAnswerRepository.findBySubmissionExamId(examId);
+        Map<Long, List<SubmissionAnswer>> answersBySubmission = allAnswers.stream()
+                .collect(Collectors.groupingBy(a -> a.getSubmission().getId()));
+        
         List<ProctorStudentDTO> students = new ArrayList<>();
         int anomalyCount = 0;
         
         for (Submission submission : inProgressSubmissions) {
-            ProctorStudentDTO dto = convertToProctorDTO(submission, totalQuestions);
+            List<SubmissionAnswer> submissionAnswers = answersBySubmission.getOrDefault(submission.getId(), Collections.emptyList());
+            ProctorStudentDTO dto = convertToProctorDTO(submission, totalQuestions, exam, submissionAnswers);
             if (dto.getAnomalyType() != null) {
                 anomalyCount++;
             }
@@ -86,7 +98,8 @@ public class ProctorService {
         return summary;
     }
 
-    private ProctorStudentDTO convertToProctorDTO(Submission submission, int totalQuestions) {
+    private ProctorStudentDTO convertToProctorDTO(Submission submission, int totalQuestions, Exam exam, 
+                                                  List<SubmissionAnswer> submissionAnswers) {
         ProctorStudentDTO dto = new ProctorStudentDTO();
         User student = submission.getStudent();
         
@@ -100,8 +113,8 @@ public class ProctorService {
         dto.setTabSwitchCount(submission.getTabSwitchCount() != null ? submission.getTabSwitchCount() : 0);
         dto.setStatus(submission.getState());
         
-        if (totalQuestions > 0 && submission.getAnswers() != null) {
-            long answeredCount = submission.getAnswers().stream()
+        if (totalQuestions > 0 && submissionAnswers != null) {
+            long answeredCount = submissionAnswers.stream()
                     .filter(a -> a.getStudentAnswer() != null && !a.getStudentAnswer().isEmpty())
                     .count();
             dto.setProgress(Math.round((double) answeredCount / totalQuestions * 1000.0) / 10.0);
@@ -109,13 +122,13 @@ public class ProctorService {
             dto.setProgress(0.0);
         }
         
-        String anomalyType = detectAnomaly(submission);
+        String anomalyType = detectAnomaly(submission, exam);
         dto.setAnomalyType(anomalyType);
         
         return dto;
     }
 
-    private String detectAnomaly(Submission submission) {
+    private String detectAnomaly(Submission submission, Exam exam) {
         LocalDateTime now = LocalDateTime.now();
         LocalDateTime lastActive = submission.getLastActiveTime();
         
@@ -126,9 +139,12 @@ public class ProctorService {
             }
         }
         
-        Integer tabCount = submission.getTabSwitchCount();
-        if (tabCount != null && tabCount >= TAB_SWITCH_EXCESS_THRESHOLD) {
-            return "EXCESS_TAB_SWITCH";
+        if (exam != null && Boolean.FALSE.equals(exam.getAllowTabSwitch())) {
+            Integer tabLimit = exam.getTabSwitchLimit();
+            Integer tabCount = submission.getTabSwitchCount();
+            if (tabLimit != null && tabCount != null && tabCount >= tabLimit) {
+                return "EXCESS_TAB_SWITCH";
+            }
         }
         
         return null;

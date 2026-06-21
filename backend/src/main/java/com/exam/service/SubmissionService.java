@@ -32,6 +32,43 @@ public class SubmissionService {
     }
 
     @Transactional
+    public void saveDraftAnswers(Long examId, Map<Long, String> answers, String username) {
+        List<Submission> existing = submissionRepository.findByExamIdAndStudentUsername(examId, username);
+        Submission submission = existing.stream()
+                .filter(s -> "IN_PROGRESS".equals(s.getState()))
+                .findFirst()
+                .orElse(null);
+        
+        if (submission == null) return;
+        
+        submission.setLastActiveTime(LocalDateTime.now());
+        
+        for (Map.Entry<Long, String> entry : answers.entrySet()) {
+            Long questionId = entry.getKey();
+            String studentAnswerText = entry.getValue();
+            
+            Optional<SubmissionAnswer> existingAnswer = submissionAnswerRepository
+                    .findBySubmissionIdAndQuestionId(submission.getId(), questionId);
+            
+            SubmissionAnswer answer;
+            if (existingAnswer.isPresent()) {
+                answer = existingAnswer.get();
+                answer.setStudentAnswer(studentAnswerText);
+            } else {
+                Question question = questionRepository.findById(questionId).orElse(null);
+                if (question == null) continue;
+                answer = new SubmissionAnswer();
+                answer.setSubmission(submission);
+                answer.setQuestion(question);
+                answer.setStudentAnswer(studentAnswerText);
+            }
+            submissionAnswerRepository.save(answer);
+        }
+        
+        submissionRepository.save(submission);
+    }
+
+    @Transactional
     public Submission startExam(Long examId, String username) {
         User student = userRepository.findByUsername(username).orElseThrow();
         Exam exam = examRepository.findById(examId).orElseThrow();

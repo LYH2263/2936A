@@ -160,6 +160,7 @@ export const endFlashSession = (sessionId) => api.post(`/flash-practice/${sessio
 export const getFlashSession = (sessionId) => api.get(`/flash-practice/${sessionId}`);
 
 export const startExam = (examId) => api.post(`/submissions/${examId}/start`);
+export const saveDraftAnswers = (examId, answers) => api.post(`/submissions/${examId}/draft`, answers);
 export const heartbeat = (examId) => api.post(`/exams/${examId}/heartbeat`);
 
 export const getProctorData = (examId) => api.get(`/proctor/${examId}`);

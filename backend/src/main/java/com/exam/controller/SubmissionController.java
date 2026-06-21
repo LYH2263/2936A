@@ -23,6 +23,12 @@ public class SubmissionController {
         return submissionService.startExam(examId, principal.getName());
     }
 
+    @PostMapping("/{examId}/draft")
+    public ResponseEntity<?> saveDraft(@PathVariable Long examId, @RequestBody Map<Long, String> answers, Principal principal) {
+        submissionService.saveDraftAnswers(examId, answers, principal.getName());
+        return ResponseEntity.ok().build();
+    }
+
     @PostMapping("/{examId}")
     public Submission submitExam(@PathVariable Long examId, @RequestBody Map<Long, String> answers, Principal principal) {
         return submissionService.submitExam(examId, answers, principal.getName());

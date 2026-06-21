@@ -506,8 +506,14 @@ public class ExamService {
         
         if (submission == null) return;
 
+        Exam exam = submission.getExam();
         if ("TAB_SWITCH".equals(type)) {
-            submission.setTabSwitchCount(submission.getTabSwitchCount() + 1);
+            if (exam == null) {
+                exam = examRepository.findById(examId).orElse(null);
+            }
+            if (exam != null && Boolean.FALSE.equals(exam.getAllowTabSwitch())) {
+                submission.setTabSwitchCount(submission.getTabSwitchCount() + 1);
+            }
         }
 
         submission.setLastActiveTime(java.time.LocalDateTime.now());

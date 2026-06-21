@@ -1,7 +1,7 @@
 <script setup>
 import { ref, onMounted, onUnmounted, computed, watch, nextTick } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { getExam, getExamQuestions, submitExam, getSubmission, recordCheating, startExam, heartbeat } from '@/api';
+import { getExam, getExamQuestions, submitExam, getSubmission, recordCheating, startExam, heartbeat, saveDraftAnswers } from '@/api';
 import { useAuthStore } from '@/stores/auth';
 import { useConfigStore } from '@/stores/config';
 import { message, Modal, notification } from 'ant-design-vue';
@@ -118,6 +118,21 @@ const formatTime = (seconds) => {
   const m = Math.floor(seconds / 60);
   const s = seconds % 60;
   return `${m}:${s < 10 ? '0' + s : s}`;
+};
+
+const sendDraftAnswers = async () => {
+    if (!isAnalysis.value && exam.value && answers.value) {
+        const answered = Object.fromEntries(
+            Object.entries(answers.value).filter(([_, v]) => v !== null && v !== undefined && v !== '')
+        );
+        if (Object.keys(answered).length > 0) {
+            try {
+                await saveDraftAnswers(examId, answered);
+            } catch (e) {
+                console.error('Save draft failed', e);
+            }
+        }
+    }
 };
 
 // Auto-save progress
@@ -306,6 +321,7 @@ const initLockdown = () => {
 
 const snapshotInterval = ref(null);
 const heartbeatInterval = ref(null);
+const draftSyncInterval = ref(null);
 
 const takeSnapshot = () => {
     if (!videoRef.value || !stream.value) return;
@@ -339,6 +355,7 @@ onMounted(() => {
               console.error('Failed to start exam', e);
           }
           heartbeatInterval.value = setInterval(sendHeartbeat, 30000);
+          draftSyncInterval.value = setInterval(sendDraftAnswers, 10000);
       }
       // Initialize lockdown after data is loaded and DOM is ready
       nextTick(() => {
@@ -354,6 +371,7 @@ onUnmounted(() => {
   clearInterval(timer.value);
   clearInterval(snapshotInterval.value);
   clearInterval(heartbeatInterval.value);
+  clearInterval(draftSyncInterval.value);
   document.removeEventListener('visibilitychange', handleVisibilityChange);
   
   const canvas = document.querySelector('.question-canvas');
