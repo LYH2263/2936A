@@ -52,6 +52,17 @@ public class ExamController {
         return examService.createQuestion(question, principal.getName());
     }
 
+    @PutMapping("/questions/{questionId}")
+    @PreAuthorize("hasRole('TEACHER') or hasRole('ADMIN')")
+    public ResponseEntity<?> updateQuestion(@PathVariable Long questionId, @RequestBody Map<String, Object> body) {
+        try {
+            Question question = examService.updateQuestion(questionId, body);
+            return ResponseEntity.ok(question);
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        }
+    }
+
     @PostMapping("/{examId}/questions")
     @PreAuthorize("hasRole('TEACHER') or hasRole('ADMIN')")
     public ResponseEntity<?> addQuestionToExam(@PathVariable Long examId, @RequestBody Map<String, Object> body) {

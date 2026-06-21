@@ -11,6 +11,7 @@ import ExamAnalysisView from '@/views/ExamAnalysisView.vue'
 import AppealStudentView from '@/views/AppealStudentView.vue'
 import AppealTeacherView from '@/views/AppealTeacherView.vue'
 import FeedbackTeacherView from '@/views/FeedbackTeacherView.vue'
+import QuestionBankView from '@/views/QuestionBankView.vue'
 import FlashPracticeView from '@/views/FlashPracticeView.vue'
 import ProctorView from '@/views/ProctorView.vue'
 
@@ -84,6 +85,12 @@ const router = createRouter({
             path: '/feedbacks/teacher',
             name: 'feedback-teacher',
             component: FeedbackTeacherView,
+            meta: { requiresAuth: true, role: 'TEACHER' }
+        },
+        {
+            path: '/question-bank',
+            name: 'question-bank',
+            component: QuestionBankView,
             meta: { requiresAuth: true, role: 'TEACHER' }
         },
         {

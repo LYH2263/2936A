@@ -220,6 +220,10 @@ const handleMenuClick = ({ key }) => {
     router.push('/feedbacks/teacher');
     return;
   }
+  if (key === 'question-bank') {
+    router.push('/question-bank');
+    return;
+  }
   if (key === 'flash-practice') {
     router.push('/flash-practice');
     return;
@@ -597,6 +601,10 @@ const refreshStudyPlans = async () => {
           <span>纠错工单</span>
           <a-badge :count="pendingFeedbackCount" :overflow-count="99" style="margin-left: 8px;" v-if="pendingFeedbackCount > 0" />
         </a-menu-item>
+        <a-menu-item key="question-bank" v-if="authStore.isTeacher">
+          <BookOutlined />
+          <span>题库管理</span>
+        </a-menu-item>
         <a-menu-item key="comment-templates" v-if="authStore.isTeacher">
           <FormOutlined />
           <span>评语模板</span>
@@ -628,6 +636,7 @@ const refreshStudyPlans = async () => {
               'my-appeals': '我的申诉',
               'appeal-review': '申诉处理台',
               'feedback-review': '纠错工单',
+              'question-bank': '题库管理',
               'comment-templates': '评语模板',
               'users': '用户管理', 
               'config': '系统设置', 

@@ -17,6 +17,8 @@ public interface QuestionFeedbackRepository extends JpaRepository<QuestionFeedba
 
     boolean existsByQuestionIdAndStudentIdAndCreatedAtAfter(Long questionId, Long studentId, LocalDateTime since);
 
+    List<QuestionFeedback> findByQuestionIdAndStudentIdAndCreatedAtAfter(Long questionId, Long studentId, LocalDateTime since);
+
     @Query("SELECT fb FROM QuestionFeedback fb WHERE fb.status = 'PENDING' ORDER BY fb.createdAt ASC")
     List<QuestionFeedback> findPendingOrderByCreatedAt();
 

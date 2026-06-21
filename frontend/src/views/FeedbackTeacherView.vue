@@ -72,17 +72,11 @@ const handleProcess = async () => {
     if (processForm.value.action === 'CONFIRM') {
       const questionId = currentFeedback.value.question?.id;
       if (questionId) {
-        try {
-          const examRes = await getQuestionExams(questionId);
-          const exams = examRes.data;
-          if (exams.length > 0) {
-            message.success('已确认纠错，正在跳转至题库编辑...');
-            processVisible.value = false;
-            detailVisible.value = false;
-            router.push(`/exam/${exams[0].examId}/assemble`);
-            return;
-          }
-        } catch (e) { /* ignore */ }
+        message.success('已确认纠错，正在跳转至题库编辑...');
+        processVisible.value = false;
+        detailVisible.value = false;
+        router.push({ path: '/question-bank', query: { highlight: questionId } });
+        return;
       }
       message.success('已确认纠错');
     } else {
@@ -103,16 +97,10 @@ const handleProcess = async () => {
 const handleConfirmAndEdit = async (fb) => {
   const questionId = fb.question?.id;
   if (questionId) {
-    try {
-      const examRes = await getQuestionExams(questionId);
-      const exams = examRes.data;
-      if (exams.length > 0) {
-        router.push(`/exam/${exams[0].examId}/assemble`);
-        return;
-      }
-    } catch (e) { /* ignore */ }
+    router.push({ path: '/question-bank', query: { highlight: questionId } });
+    return;
   }
-  message.warning('未找到包含该题目的试卷');
+  message.warning('未找到题目');
 };
 
 const parseOptions = (optionsStr) => {

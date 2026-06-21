@@ -6,6 +6,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface SubmissionAnswerRepository extends JpaRepository<SubmissionAnswer, Long> {
     java.util.List<SubmissionAnswer> findBySubmissionExamId(Long examId);
 
+    java.util.Optional<SubmissionAnswer> findBySubmissionIdAndQuestionId(Long submissionId, Long questionId);
+
     @org.springframework.data.jpa.repository.Query("SELECT sa.question.id, AVG(sa.score), " +
             "SUM(CASE WHEN sa.score = eq.score THEN 1 ELSE 0 END) * 100.0 / COUNT(sa.id) " +
             "FROM SubmissionAnswer sa " +

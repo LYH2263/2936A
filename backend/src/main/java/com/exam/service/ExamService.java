@@ -70,6 +70,55 @@ public class ExamService {
     }
 
     @Transactional
+    public Question updateQuestion(Long questionId, Map<String, Object> body) {
+        Question question = questionRepository.findById(questionId)
+                .orElseThrow(() -> new RuntimeException("题目不存在"));
+
+        if (body.containsKey("content")) {
+            String content = (String) body.get("content");
+            if (content == null || content.trim().isEmpty()) {
+                throw new RuntimeException("题干不能为空");
+            }
+            question.setContent(content.trim());
+        }
+        if (body.containsKey("type")) {
+            String type = (String) body.get("type");
+            List<String> validTypes = List.of("SINGLE", "MULTI", "JUDGE", "SHORT");
+            if (!validTypes.contains(type)) {
+                throw new RuntimeException("无效的题型");
+            }
+            question.setType(type);
+        }
+        if (body.containsKey("options")) {
+            question.setOptions((String) body.get("options"));
+        }
+        if (body.containsKey("answer")) {
+            question.setAnswer((String) body.get("answer"));
+        }
+        if (body.containsKey("analysis")) {
+            question.setAnalysis((String) body.get("analysis"));
+        }
+        if (body.containsKey("subject")) {
+            question.setSubject((String) body.get("subject"));
+        }
+        if (body.containsKey("knowledgePoint")) {
+            question.setKnowledgePoint((String) body.get("knowledgePoint"));
+        }
+        if (body.containsKey("difficulty")) {
+            Integer difficulty = Integer.valueOf(body.get("difficulty").toString());
+            if (difficulty < 1 || difficulty > 5) {
+                throw new RuntimeException("难度必须在 1-5 之间");
+            }
+            question.setDifficulty(difficulty);
+        }
+        if (body.containsKey("defaultScore")) {
+            question.setDefaultScore(Integer.valueOf(body.get("defaultScore").toString()));
+        }
+
+        return questionRepository.save(question);
+    }
+
+    @Transactional
     public void addQuestionToExam(Long examId, Long questionId, Integer score, Integer sequence) {
         Exam exam = getExamById(examId);
         Question question = questionRepository.findById(questionId).orElseThrow(() -> new RuntimeException("Question not found"));

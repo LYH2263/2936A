@@ -166,12 +166,22 @@ const formatDate = (dateStr) => {
 const hasRecentFeedback = (qId) => {
   const now = new Date();
   const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-  return existingFeedbacks.value.some(fb => {
-    if (fb.question?.id !== qId && fb.question !== qId) return false;
-    if (fb.status === 'PENDING') return true;
+  const feedbacks = existingFeedbacks.value.filter(fb =>
+    fb.question?.id === qId || fb.question === qId
+  );
+
+  const hasPending = feedbacks.some(fb => fb.status === 'PENDING');
+  if (hasPending) return true;
+
+  const hasConfirmed = feedbacks.some(fb => fb.status === 'CONFIRMED');
+  if (hasConfirmed) return true;
+
+  const recentRejected = feedbacks.some(fb => {
+    if (fb.status !== 'REJECTED') return false;
     const created = new Date(fb.createdAt);
     return created > twentyFourHoursAgo;
   });
+  return recentRejected;
 };
 
 const getFeedbackStatus = (qId) => {
@@ -180,6 +190,15 @@ const getFeedbackStatus = (qId) => {
 };
 
 const openFeedbackModal = (qId, questionIndex) => {
+  const answer = getAnswerByQuestionId(qId);
+  if (!answer || !answer.studentAnswer || answer.studentAnswer.trim() === '') {
+    message.warning('您未作答过该题，无法提交纠错');
+    return;
+  }
+  if (!submission.value?.exam?.allowViewAnalysis) {
+    message.warning('该考试未开放解析，无法提交纠错');
+    return;
+  }
   feedbackQuestionId.value = qId;
   feedbackQuestionIndex.value = questionIndex;
   feedbackType.value = 'ANSWER_ERROR';
@@ -196,10 +215,23 @@ const handleFeedbackSubmit = async () => {
     message.warning('补充说明不能超过500字');
     return;
   }
+
+  const answer = getAnswerByQuestionId(feedbackQuestionId.value);
+  if (!answer || !answer.studentAnswer || answer.studentAnswer.trim() === '') {
+    message.warning('您未作答过该题，无法提交纠错');
+    return;
+  }
+
+  if (!submission.value?.exam?.allowViewAnalysis) {
+    message.warning('该考试未开放解析，无法提交纠错');
+    return;
+  }
+
   submittingFeedback.value = true;
   try {
     await submitFeedback({
       questionId: feedbackQuestionId.value,
+      submissionId: parseInt(submissionId),
       type: feedbackType.value,
       description: feedbackDescription.value.trim()
     });
@@ -323,14 +355,16 @@ onMounted(fetchData);
                       <AlertOutlined /> 申诉
                     </a-button>
                     <a-divider type="vertical" />
-                    <a-button v-if="hasRecentFeedback(q.question.id)" type="link" size="small" disabled>
-                      <ClockCircleOutlined /> 已纠错
-                    </a-button>
-                    <a-tag v-else-if="getFeedbackStatus(q.question.id) === 'CONFIRMED'" color="green">纠错已确认</a-tag>
-                    <a-tag v-else-if="getFeedbackStatus(q.question.id) === 'REJECTED'" color="red">纠错已驳回</a-tag>
-                    <a-button v-else type="link" size="small" @click="openFeedbackModal(q.question.id, index + 1)">
-                      <FlagOutlined /> 报告问题
-                    </a-button>
+                    <template v-if="submission?.exam?.allowViewAnalysis && getAnswerByQuestionId(q.question.id)?.studentAnswer?.trim()">
+                      <a-button v-if="hasRecentFeedback(q.question.id)" type="link" size="small" disabled>
+                        <ClockCircleOutlined /> 已纠错
+                      </a-button>
+                      <a-tag v-else-if="getFeedbackStatus(q.question.id) === 'CONFIRMED'" color="green">纠错已确认</a-tag>
+                      <a-tag v-else-if="getFeedbackStatus(q.question.id) === 'REJECTED'" color="red">纠错已驳回</a-tag>
+                      <a-button v-else type="link" size="small" @click="openFeedbackModal(q.question.id, index + 1)">
+                        <FlagOutlined /> 报告问题
+                      </a-button>
+                    </template>
                   </template>
                </div>
             </div>
