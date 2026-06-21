@@ -17,6 +17,6 @@ public interface CommentTemplateRepository extends JpaRepository<CommentTemplate
 
     List<CommentTemplate> findByTeacherAndSubjectOrderByCreatedAtDesc(User teacher, String subject);
 
-    @Query("SELECT ct FROM CommentTemplate ct WHERE (ct.teacher = :teacher OR ct.isPublic = true) AND ct.subject = :subject ORDER BY ct.createdAt DESC")
+    @Query("SELECT ct FROM CommentTemplate ct WHERE (ct.teacher = :teacher OR ct.isPublic = true) AND (ct.subject = :subject OR ct.subject IS NULL OR ct.subject = '') ORDER BY CASE WHEN ct.subject = :subject THEN 0 ELSE 1 END, ct.createdAt DESC")
     List<CommentTemplate> findVisibleToTeacherBySubject(@Param("teacher") User teacher, @Param("subject") String subject);
 }

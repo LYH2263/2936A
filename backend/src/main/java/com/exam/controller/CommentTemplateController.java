@@ -37,8 +37,8 @@ public class CommentTemplateController {
     }
 
     @GetMapping("/{id}")
-    public CommentTemplate getTemplate(@PathVariable Long id) {
-        return commentTemplateService.getTemplate(id);
+    public CommentTemplate getTemplate(@PathVariable Long id, Principal principal) {
+        return commentTemplateService.getTemplate(principal.getName(), id);
     }
 
     @PostMapping

@@ -46,10 +46,10 @@ const fetchData = async () => {
 const fetchCommentTemplates = async () => {
   templateLoading.value = true;
   try {
-    const res = await getCommentTemplates();
+    const course = submission.value?.exam?.course;
+    const res = await getCommentTemplates(course);
     commentTemplates.value = res.data;
   } catch (e) {
-    // Don't show error for templates - it's not critical
     console.warn('加载评语模板失败', e);
   } finally {
     templateLoading.value = false;
@@ -168,7 +168,6 @@ const getStatusColor = (sa) => {
                 <div class="label-row">
                   <span class="label">评语:</span>
                   <a-select
-                    v-if="!isObjective(qItem.question.type)"
                     :loading="templateLoading"
                     style="width: 200px; margin-left: auto;"
                     placeholder="插入模板..."

@@ -92,6 +92,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/feedbacks").hasRole("STUDENT")
                         .requestMatchers("/api/feedbacks/my").hasRole("STUDENT")
                         .requestMatchers("/api/feedbacks/**").authenticated()
+                        .requestMatchers("/api/comment-templates/**").hasAnyRole("TEACHER", "ADMIN")
                         .anyRequest().authenticated()
                 )
                 .exceptionHandling(exception -> exception

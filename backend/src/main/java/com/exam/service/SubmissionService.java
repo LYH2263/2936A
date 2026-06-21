@@ -153,14 +153,29 @@ public class SubmissionService {
         return submission;
     }
     
+    private int compareByScoreDesc(Submission a, Submission b) {
+        int scoreA = a.getScore() != null ? a.getScore() : Integer.MIN_VALUE;
+        int scoreB = b.getScore() != null ? b.getScore() : Integer.MIN_VALUE;
+        return Integer.compare(scoreB, scoreA);
+    }
+
+    private int compareByEndTimeDesc(Submission a, Submission b) {
+        LocalDateTime endA = a.getEndTime() != null ? a.getEndTime() : a.getStartTime();
+        LocalDateTime endB = b.getEndTime() != null ? b.getEndTime() : b.getStartTime();
+        if (endA == null && endB == null) return 0;
+        if (endA == null) return 1;
+        if (endB == null) return -1;
+        return endB.compareTo(endA);
+    }
+
     public List<Submission> getStudentSubmissions(String username) {
         List<Submission> submissions = submissionRepository.findByStudentUsername(username);
         for (Submission s : submissions) {
             Long examId = s.getExam().getId();
             List<Submission> allSubmissionsForExam = submissionRepository.findByExamId(examId);
             
-            // Sort by score descending to find rank
-            allSubmissionsForExam.sort((a, b) -> b.getScore().compareTo(a.getScore()));
+            // Sort by score descending to find rank (IN_PROGRESS submissions have null score)
+            allSubmissionsForExam.sort(this::compareByScoreDesc);
             
             int rank = 1;
             for (Submission item : allSubmissionsForExam) {
@@ -185,7 +200,7 @@ public class SubmissionService {
         
         // Calculate ranking
         List<Submission> allSubmissionsForExam = submissionRepository.findByExamId(submission.getExam().getId());
-        allSubmissionsForExam.sort((a, b) -> b.getScore().compareTo(a.getScore()));
+        allSubmissionsForExam.sort(this::compareByScoreDesc);
         int rank = 1;
         for (Submission item : allSubmissionsForExam) {
             if (item.getId().equals(submission.getId())) break;
@@ -222,17 +237,19 @@ public class SubmissionService {
 
     public StudentStatsDTO getStudentStats(String username) {
         List<Submission> userSubmissions = submissionRepository.findByStudentUsername(username);
+        List<Submission> gradedSubmissions = userSubmissions.stream()
+                .filter(s -> "SUBMITTED".equals(s.getState()) && s.getScore() != null)
+                .collect(Collectors.toList());
         StudentStatsDTO stats = new StudentStatsDTO();
         
-        long totalExams = userSubmissions.size();
+        long totalExams = gradedSubmissions.size();
         stats.setTotalExams(totalExams);
         
         if (totalExams > 0) {
             double totalScorePct = 0;
             int passCount = 0;
             
-            for (Submission s : userSubmissions) {
-                // Ensure examTotalScore is present
+            for (Submission s : gradedSubmissions) {
                 Integer totalScore = examQuestionRepository.sumScoreByExamId(s.getExam().getId());
                 int total = totalScore != null ? totalScore : 0;
                 
@@ -275,7 +292,7 @@ public class SubmissionService {
         
         // Recent submissions
         List<Submission> recent = userSubmissions.stream()
-                .sorted((a, b) -> b.getEndTime().compareTo(a.getEndTime()))
+                .sorted(this::compareByEndTimeDesc)
                 .limit(5)
                 .collect(Collectors.toList());
         stats.setRecentSubmissions(recent);

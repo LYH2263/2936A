@@ -61,7 +61,7 @@ public class CommentTemplateService {
         boolean isAdmin = "ADMIN".equals(user.getRole());
 
         if (!isOwner && !isAdmin) {
-            throw new RuntimeException("Permission denied: you can only edit your own templates");
+            throw new RuntimeException("无权编辑该模板：仅创建者和管理员可修改");
         }
 
         existing.setName(template.getName());
@@ -83,14 +83,22 @@ public class CommentTemplateService {
         boolean isAdmin = "ADMIN".equals(user.getRole());
 
         if (!isOwner && !isAdmin) {
-            throw new RuntimeException("Permission denied: you can only delete your own templates");
+            throw new RuntimeException("无权删除该模板：仅创建者和管理员可操作");
         }
 
         commentTemplateRepository.delete(existing);
     }
 
-    public CommentTemplate getTemplate(Long id) {
-        return commentTemplateRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Template not found"));
+    public CommentTemplate getTemplate(String username, Long id) {
+        User user = userRepository.findByUsername(username).orElseThrow(() -> new RuntimeException("用户不存在"));
+        CommentTemplate template = commentTemplateRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("评语模板不存在"));
+        boolean isOwner = template.getTeacher() != null && template.getTeacher().getId().equals(user.getId());
+        boolean isAdmin = "ADMIN".equals(user.getRole());
+        boolean isPublic = Boolean.TRUE.equals(template.getIsPublic());
+        if (!isOwner && !isAdmin && !isPublic) {
+            throw new RuntimeException("无权访问该模板：仅创建者、管理员或公共模板可查看");
+        }
+        return template;
     }
 }
