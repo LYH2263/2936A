@@ -57,7 +57,8 @@ public class BadgeService {
         checkWeeklyActive(student);
     }
 
-    public void checkAfterGrading(User student) {
+    public void checkAfterGrading(User student, Submission submission) {
+        checkPerfectScore(student, submission);
         checkPassStreak(student);
     }
 
@@ -79,13 +80,24 @@ public class BadgeService {
 
     private void checkPassStreak(User student) {
         List<Submission> subs = submissionRepository.findByStudentUsername(student.getUsername());
-        List<Submission> submitted = subs.stream()
-                .filter(s -> "SUBMITTED".equals(s.getState()) && s.getScore() != null)
+        Map<Long, Submission> latestByExam = new LinkedHashMap<>();
+        for (Submission s : subs) {
+            if (!"SUBMITTED".equals(s.getState()) || s.getScore() == null) continue;
+            Long examId = s.getExam().getId();
+            if (!latestByExam.containsKey(examId) ||
+                    s.getEndTime() != null && latestByExam.get(examId).getEndTime() != null
+                    && s.getEndTime().isAfter(latestByExam.get(examId).getEndTime())) {
+                latestByExam.put(examId, s);
+            }
+        }
+
+        List<Submission> sorted = latestByExam.values().stream()
+                .filter(s -> s.getEndTime() != null)
                 .sorted(Comparator.comparing(Submission::getEndTime))
                 .collect(Collectors.toList());
 
         int streak = 0;
-        for (Submission s : submitted) {
+        for (Submission s : sorted) {
             Integer totalScore = examQuestionRepository.sumScoreByExamId(s.getExam().getId());
             int total = totalScore != null ? totalScore : 0;
             if (total > 0 && (double) s.getScore() / total >= 0.6) {
@@ -105,12 +117,14 @@ public class BadgeService {
         LocalDateTime weekStart = now.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY)).toLocalDate().atStartOfDay();
 
         List<Submission> subs = submissionRepository.findByStudentUsername(student.getUsername());
-        long countThisWeek = subs.stream()
+        long distinctExamCount = subs.stream()
                 .filter(s -> "SUBMITTED".equals(s.getState()))
                 .filter(s -> s.getEndTime() != null && !s.getEndTime().isBefore(weekStart))
+                .map(s -> s.getExam().getId())
+                .distinct()
                 .count();
 
-        if (countThisWeek >= 3) {
+        if (distinctExamCount >= 3) {
             awardBadge(student, Badge.WEEKLY_ACTIVE);
         }
     }

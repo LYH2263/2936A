@@ -792,10 +792,11 @@ const refreshStudyPlans = async () => {
               <a-skeleton :loading="badgesLoading" active :paragraph="{ rows: 2 }">
                 <a-row :gutter="[16, 16]">
                   <a-col v-for="badge in badges" :key="badge.code" :xs="8" :sm="8" :md="4">
-                    <a-tooltip :title="badge.earned ? `${badge.label} — ${badge.description}（${new Date(badge.earnedAt).toLocaleDateString()} 获得）` : `${badge.label} — ${badge.description}`">
+                    <a-tooltip :title="badge.earned ? `${badge.description}` : `${badge.label} — ${badge.description}`">
                       <div :class="['badge-card', badge.earned ? 'badge-earned' : 'badge-locked']">
                         <span class="badge-icon">{{ badge.icon }}</span>
                         <div class="badge-label">{{ badge.label }}</div>
+                        <div v-if="badge.earned && badge.earnedAt" class="badge-date">{{ new Date(badge.earnedAt).toLocaleDateString() }}</div>
                       </div>
                     </a-tooltip>
                   </a-col>
@@ -1142,10 +1143,11 @@ const refreshStudyPlans = async () => {
                <a-skeleton :loading="badgesLoading" active :paragraph="{ rows: 2 }">
                  <a-row :gutter="[16, 16]">
                    <a-col v-for="badge in badges" :key="badge.code" :xs="8" :sm="6" :md="4">
-                     <a-tooltip :title="badge.earned ? `${badge.label} — ${badge.description}（${new Date(badge.earnedAt).toLocaleDateString()} 获得）` : `${badge.label} — ${badge.description}`">
+                     <a-tooltip :title="badge.earned ? `${badge.description}` : `${badge.label} — ${badge.description}`">
                        <div :class="['badge-card', badge.earned ? 'badge-earned' : 'badge-locked']">
                          <span class="badge-icon">{{ badge.icon }}</span>
                          <div class="badge-label">{{ badge.label }}</div>
+                         <div v-if="badge.earned && badge.earnedAt" class="badge-date">{{ new Date(badge.earnedAt).toLocaleDateString() }}</div>
                        </div>
                      </a-tooltip>
                    </a-col>
@@ -1521,6 +1523,12 @@ const refreshStudyPlans = async () => {
   overflow: hidden;
   text-overflow: ellipsis;
   max-width: 100%;
+}
+.badge-date {
+  font-size: 10px;
+  color: #d48806;
+  margin-top: 4px;
+  white-space: nowrap;
 }
 .badge-locked .badge-label {
   color: #999;

@@ -232,7 +232,7 @@ public class SubmissionService {
         submission.setScore(totalScore);
         submissionRepository.save(submission);
 
-        badgeService.checkAfterGrading(submission.getStudent());
+        badgeService.checkAfterGrading(submission.getStudent(), submission);
     }
 
     public StudentStatsDTO getStudentStats(String username) {
