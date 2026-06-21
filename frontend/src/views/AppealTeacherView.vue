@@ -1,7 +1,7 @@
 <script setup>
 import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
-import { getPendingAppeals, processAppeal } from '@/api';
+import { getPendingAppeals, processAppeal, getExamQuestions } from '@/api';
 import { message } from 'ant-design-vue';
 import { LeftOutlined, CheckCircleOutlined, CloseCircleOutlined, EyeOutlined } from '@ant-design/icons-vue';
 
@@ -17,6 +17,7 @@ const processForm = ref({
   handlerComment: '',
   newScore: null
 });
+const maxScore = ref(100);
 
 const statusMap = {
   'PENDING': { text: '待处理', color: 'orange' },
@@ -41,7 +42,7 @@ const showDetail = (appeal) => {
   detailVisible.value = true;
 };
 
-const openProcess = (appeal, action) => {
+const openProcess = async (appeal, action) => {
   currentAppeal.value = appeal;
   processForm.value = {
     action: action,
@@ -50,6 +51,15 @@ const openProcess = (appeal, action) => {
   };
   if (action === 'APPROVE') {
     processForm.value.newScore = appeal.answer?.score || 0;
+    try {
+      const examId = appeal.submission?.exam?.id;
+      const questionId = appeal.answer?.question?.id;
+      const qRes = await getExamQuestions(examId);
+      const eq = qRes.data.find(q => q.question.id === questionId);
+      maxScore.value = eq ? eq.score : 100;
+    } catch (e) {
+      maxScore.value = 100;
+    }
   }
   processVisible.value = true;
 };
@@ -198,8 +208,8 @@ onMounted(fetchAppeals);
 
     <a-modal v-model:open="processVisible" :title="processForm.action === 'APPROVE' ? '改分处理' : '维持原判'" :confirm-loading="processing" @ok="handleProcess" ok-text="确认" cancel-text="取消" width="500px">
       <a-form layout="vertical">
-        <a-form-item v-if="processForm.action === 'APPROVE'" label="新分数" required>
-          <a-input-number v-model:value="processForm.newScore" :min="0" :max="100" style="width: 100%;" />
+        <a-form-item v-if="processForm.action === 'APPROVE'" :label="'新分数（满分 ' + maxScore + '）'" required>
+          <a-input-number v-model:value="processForm.newScore" :min="0" :max="maxScore" style="width: 100%;" />
         </a-form-item>
         <a-form-item label="处理说明" required>
           <a-textarea v-model:value="processForm.handlerComment" placeholder="请填写处理说明" :rows="3" />

@@ -16,17 +16,20 @@ public class AppealService {
     private final SubmissionRepository submissionRepository;
     private final SubmissionAnswerRepository submissionAnswerRepository;
     private final UserRepository userRepository;
+    private final ExamQuestionRepository examQuestionRepository;
     private final BadgeService badgeService;
 
     public AppealService(AppealRepository appealRepository,
                          SubmissionRepository submissionRepository,
                          SubmissionAnswerRepository submissionAnswerRepository,
                          UserRepository userRepository,
+                         ExamQuestionRepository examQuestionRepository,
                          BadgeService badgeService) {
         this.appealRepository = appealRepository;
         this.submissionRepository = submissionRepository;
         this.submissionAnswerRepository = submissionAnswerRepository;
         this.userRepository = userRepository;
+        this.examQuestionRepository = examQuestionRepository;
         this.badgeService = badgeService;
     }
 
@@ -55,6 +58,11 @@ public class AppealService {
 
         if (appealRepository.existsByAnswerIdAndStatus(answerId, "PENDING")) {
             throw new RuntimeException("该题目已有待处理的申诉");
+        }
+
+        if (appealRepository.existsByAnswerIdAndStatus(answerId, "APPROVED") ||
+            appealRepository.existsByAnswerIdAndStatus(answerId, "REJECTED")) {
+            throw new RuntimeException("该题目已有处理结果，不可重复申诉");
         }
 
         if (reason == null || reason.trim().isEmpty()) {
@@ -103,14 +111,31 @@ public class AppealService {
             throw new RuntimeException("只有教师才能处理申诉");
         }
 
+        if (handlerComment == null || handlerComment.trim().isEmpty()) {
+            throw new RuntimeException("处理说明不能为空");
+        }
+
         appeal.setHandler(handler);
-        appeal.setHandlerComment(handlerComment);
+        appeal.setHandlerComment(handlerComment.trim());
         appeal.setHandledAt(LocalDateTime.now());
 
         if ("APPROVE".equals(action)) {
             if (newScore == null) {
                 throw new RuntimeException("改分时必须提供新分数");
             }
+
+            Exam exam = appeal.getSubmission().getExam();
+            Question question = appeal.getAnswer().getQuestion();
+            List<ExamQuestion> examQuestions = examQuestionRepository.findByExamIdAndQuestionId(exam.getId(), question.getId());
+            int maxScore = 0;
+            if (examQuestions != null && !examQuestions.isEmpty()) {
+                maxScore = examQuestions.get(0).getScore();
+            }
+
+            if (newScore < 0 || newScore > maxScore) {
+                throw new RuntimeException("新分数必须在 0 至 " + maxScore + " 之间");
+            }
+
             appeal.setStatus("APPROVED");
             appeal.setNewScore(newScore);
 
@@ -137,8 +162,19 @@ public class AppealService {
         return appealRepository.save(appeal);
     }
 
-    public Appeal getAppealById(Long appealId) {
-        return appealRepository.findById(appealId)
+    public Appeal getAppealById(Long appealId, String username) {
+        Appeal appeal = appealRepository.findById(appealId)
                 .orElseThrow(() -> new RuntimeException("申诉不存在"));
+
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException("用户不存在"));
+
+        if ("STUDENT".equals(user.getRole())) {
+            if (!appeal.getStudent().getId().equals(user.getId())) {
+                throw new RuntimeException("无权查看他人申诉");
+            }
+        }
+
+        return appeal;
     }
 }

@@ -56,7 +56,7 @@ public class AppealController {
     @GetMapping("/{id}")
     public ResponseEntity<?> getAppeal(@PathVariable Long id, Principal principal) {
         try {
-            Appeal appeal = appealService.getAppealById(id);
+            Appeal appeal = appealService.getAppealById(id, principal.getName());
             return ResponseEntity.ok(appeal);
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));

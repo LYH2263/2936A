@@ -149,6 +149,7 @@ onMounted(() => {
         { title: '申诉理由', dataIndex: 'reason', key: 'reason', ellipsis: true },
         { title: '申诉时间', dataIndex: 'createdAt', key: 'createdAt', customRender: ({text}) => text ? new Date(text).toLocaleString() : '-' },
         { title: '状态', key: 'status', width: 120 },
+        { title: '得分变化', key: 'score', width: 160 },
         { title: '处理说明', dataIndex: 'handlerComment', key: 'handlerComment', ellipsis: true },
         { title: '操作', key: 'action', width: 120 }
       ]">
@@ -161,6 +162,18 @@ onMounted(() => {
               <component :is="statusMap[record.status]?.icon" style="margin-right: 4px;" v-if="statusMap[record.status]?.icon" />
               {{ statusMap[record.status]?.text || record.status }}
             </a-tag>
+          </template>
+          <template v-if="column.key === 'score'">
+            <template v-if="record.status === 'APPROVED'">
+              <span style="color: #999; text-decoration: line-through;">{{ record.answer?.score }}</span>
+              <span style="color: #52c41a; font-weight: 600; margin-left: 8px;">→ {{ record.newScore }}</span>
+            </template>
+            <template v-else-if="record.status === 'PENDING'">
+              <span style="color: #999;">处理中</span>
+            </template>
+            <template v-else>
+              <span style="color: #999;">{{ record.answer?.score }}</span>
+            </template>
           </template>
           <template v-if="column.key === 'action'">
             <a-button type="link" size="small" @click="viewScoreDetail(record.submission?.id)">

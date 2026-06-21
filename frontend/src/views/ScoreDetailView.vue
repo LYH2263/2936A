@@ -116,6 +116,12 @@ const getAppealStatus = (qId) => {
   return appeal ? appeal.status : null;
 };
 
+const getAppealByQuestionId = (qId) => {
+  const answer = getAnswerByQuestionId(qId);
+  if (!answer) return null;
+  return existingAppeals.value.find(a => a.answer?.id === answer.id);
+};
+
 const openAppealModal = (qId, questionIndex) => {
   const answer = getAnswerByQuestionId(qId);
   if (!answer) return;
@@ -298,8 +304,21 @@ onMounted(fetchData);
                     <a-button v-if="hasPendingAppeal(q.question.id)" type="link" size="small" disabled>
                       <ClockCircleOutlined /> 申诉中
                     </a-button>
-                    <a-tag v-else-if="getAppealStatus(q.question.id) === 'APPROVED'" color="green">申诉已通过</a-tag>
-                    <a-tag v-else-if="getAppealStatus(q.question.id) === 'REJECTED'" color="red">申诉已驳回</a-tag>
+                    <template v-else-if="getAppealStatus(q.question.id) === 'APPROVED'">
+                      <a-tag color="green">申诉已通过</a-tag>
+                      <span style="margin-left: 8px; color: #52c41a; font-weight: 600;">
+                        改后得分: {{ getAppealByQuestionId(q.question.id)?.newScore }}
+                      </span>
+                      <span v-if="getAppealByQuestionId(q.question.id)?.handlerComment" style="margin-left: 8px; color: #999; font-size: 12px;">
+                        ({{ getAppealByQuestionId(q.question.id)?.handlerComment }})
+                      </span>
+                    </template>
+                    <template v-else-if="getAppealStatus(q.question.id) === 'REJECTED'">
+                      <a-tag color="red">申诉已驳回</a-tag>
+                      <span v-if="getAppealByQuestionId(q.question.id)?.handlerComment" style="margin-left: 8px; color: #999; font-size: 12px;">
+                        ({{ getAppealByQuestionId(q.question.id)?.handlerComment }})
+                      </span>
+                    </template>
                     <a-button v-else type="link" size="small" @click="openAppealModal(q.question.id, index + 1)">
                       <AlertOutlined /> 申诉
                     </a-button>
