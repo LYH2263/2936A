@@ -395,14 +395,14 @@ const handleTabChange = (key) => {
                          <span class="difficulty-num">{{ record.presetDifficulty || 0 }}</span>
                       </template>
                       <template v-if="column.key === 'perceivedDifficulty'">
-                         <template v-if="record.perceivedDifficultyCount >= 10">
+                         <template v-if="record.perceivedDifficultyCount > 0">
                             <a-rate v-model:value="record.perceivedDifficultyAverage" disabled allow-half />
                             <span class="difficulty-num">{{ record.perceivedDifficultyAverage?.toFixed(1) || '0.0' }}</span>
                             <span class="rating-count"> ({{ record.perceivedDifficultyCount }}人评)</span>
+                            <a-tag v-if="record.perceivedDifficultyCount < 10" color="default" style="margin-left: 6px;">样本不足</a-tag>
                          </template>
                          <template v-else>
-                            <a-tag color="default">样本不足</a-tag>
-                            <span class="rating-count"> ({{ record.perceivedDifficultyCount || 0 }}人评)</span>
+                            <span class="difficulty-num" style="color:#bfbfbf;">暂无评分</span>
                          </template>
                       </template>
                     </template>
