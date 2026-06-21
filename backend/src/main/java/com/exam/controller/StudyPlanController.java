@@ -3,14 +3,15 @@ package com.exam.controller;
 import com.exam.dto.StudyPlanDTO;
 import com.exam.service.StudyPlanService;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.security.Principal;
 import java.util.List;
-import java.util.Map;
 
 @RestController
 @RequestMapping("/api/study-plans")
+@PreAuthorize("hasRole('STUDENT')")
 public class StudyPlanController {
 
     private final StudyPlanService studyPlanService;
@@ -52,8 +53,12 @@ public class StudyPlanController {
     }
 
     @DeleteMapping("/{planId}/tasks/{taskId}")
-    public ResponseEntity<?> deleteTask(Principal principal, @PathVariable Long planId, @PathVariable Long taskId) {
-        studyPlanService.deleteTask(principal.getName(), planId, taskId);
-        return ResponseEntity.ok().build();
+    public ResponseEntity<StudyPlanDTO> deleteTask(Principal principal, @PathVariable Long planId, @PathVariable Long taskId) {
+        return ResponseEntity.ok(studyPlanService.deleteTask(principal.getName(), planId, taskId));
+    }
+
+    @PostMapping("/{planId}/log-minutes")
+    public ResponseEntity<StudyPlanDTO> logMinutes(Principal principal, @PathVariable Long planId, @RequestBody StudyPlanDTO.LogMinutesRequest request) {
+        return ResponseEntity.ok(studyPlanService.logMinutes(principal.getName(), planId, request));
     }
 }

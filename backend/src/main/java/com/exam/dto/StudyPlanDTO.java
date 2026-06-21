@@ -9,6 +9,8 @@ public class StudyPlanDTO {
     private Long examId;
     private String examTitle;
     private Integer dailyGoalMinutes;
+    private Integer todayStudiedMinutes;
+    private Double minutesProgress;
     private String status;
     private String createdAt;
     private String archivedAt;
@@ -46,6 +48,11 @@ public class StudyPlanDTO {
     }
 
     @Data
+    public static class LogMinutesRequest {
+        private Integer minutes;
+    }
+
+    @Data
     public static class DashboardCard {
         private Long planId;
         private Long examId;
@@ -55,5 +62,8 @@ public class StudyPlanDTO {
         private Integer streakDays;
         private Integer totalTasksToday;
         private Integer completedTasksToday;
+        private Integer dailyGoalMinutes;
+        private Integer todayStudiedMinutes;
+        private Double minutesProgress;
     }
 }

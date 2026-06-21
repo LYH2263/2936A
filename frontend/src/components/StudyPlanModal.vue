@@ -1,8 +1,8 @@
 <script setup>
 import { ref, watch, computed } from 'vue';
-import { createStudyPlan, getStudyPlanByExam, checkInStudyPlanTask, addStudyPlanTask, deleteStudyPlanTask } from '@/api';
+import { createStudyPlan, getStudyPlanByExam, checkInStudyPlanTask, addStudyPlanTask, deleteStudyPlanTask, logStudyPlanMinutes } from '@/api';
 import { message } from 'ant-design-vue';
-import { PlusOutlined, DeleteOutlined, CheckCircleFilled, ClockCircleOutlined, EditOutlined } from '@ant-design/icons-vue';
+import { PlusOutlined, DeleteOutlined, CheckCircleFilled, ClockCircleOutlined, EditOutlined, SaveOutlined, StopOutlined } from '@ant-design/icons-vue';
 
 const props = defineProps(['open', 'examId', 'examTitle']);
 const emit = defineEmits(['update:open', 'created']);
@@ -17,6 +17,9 @@ const form = ref({
   taskTitles: ['复习课本重点章节', '刷历年真题', '整理错题笔记']
 });
 const newTaskTitle = ref('');
+
+const logMinutes = ref(null);
+const loggingMinutes = ref(false);
 
 const fetchPlan = async () => {
   if (!props.examId) return;
@@ -102,6 +105,24 @@ const handleDeleteTask = async (taskId) => {
   }
 };
 
+const handleLogMinutes = async () => {
+  if (logMinutes.value === null || logMinutes.value === undefined || logMinutes.value < 0) {
+    message.error('请输入有效的学习时长');
+    return;
+  }
+  loggingMinutes.value = true;
+  try {
+    const res = await logStudyPlanMinutes(plan.value.id, { minutes: Number(logMinutes.value) });
+    plan.value = res.data;
+    logMinutes.value = null;
+    message.success('学习时长已记录');
+  } catch (e) {
+    message.error(e.response?.data?.message || '记录失败');
+  } finally {
+    loggingMinutes.value = false;
+  }
+};
+
 const addTaskRow = () => {
   form.value.taskTitles.push('');
 };
@@ -115,11 +136,17 @@ const todayProgress = computed(() => {
   return Math.round(plan.value.todayProgress || 0);
 });
 
+const minutesProgress = computed(() => {
+  if (!plan.value) return 0;
+  return Math.round(plan.value.minutesProgress || 0);
+});
+
 const handleCancel = () => {
   emit('update:open', false);
 };
 
 const formatGoal = (minutes) => {
+  if (!minutes) return '0分钟';
   const h = Math.floor(minutes / 60);
   const m = minutes % 60;
   if (h > 0 && m > 0) return `${h}小时${m}分钟`;
@@ -134,11 +161,10 @@ const formatGoal = (minutes) => {
     :title="mode === 'create' ? '制定备考计划' : (mode === 'archived' ? '备考计划（已归档）' : '我的备考计划')"
     @cancel="handleCancel"
     :footer="null"
-    width="640px"
+    width="680px"
     :destroyOnClose="true"
   >
     <a-spin :spinning="loading">
-      <!-- CREATE MODE -->
       <div v-if="mode === 'create'" class="create-form">
         <a-form layout="vertical">
           <a-form-item label="考试名称">
@@ -174,7 +200,6 @@ const formatGoal = (minutes) => {
         </a-form>
       </div>
 
-      <!-- MANAGE MODE -->
       <div v-else-if="mode === 'manage'" class="manage-section">
         <div class="plan-header">
           <div class="plan-meta">
@@ -189,18 +214,51 @@ const formatGoal = (minutes) => {
               <span>连续打卡: <b style="color: #52c41a;">{{ plan.streakDays }}天</b></span>
             </div>
           </div>
-          <div class="progress-ring-wrapper">
-            <a-progress
-              type="circle"
-              :percent="todayProgress"
-              :size="80"
-              :stroke-color="todayProgress === 100 ? '#52c41a' : '#1890ff'"
-            >
-              <template #format="{ percent }">
-                <span style="font-size: 14px; font-weight: 600;">{{ percent }}%</span>
-              </template>
-            </a-progress>
-            <div class="progress-label">今日进度</div>
+          <div class="progress-rings">
+            <div class="ring-item">
+              <a-progress
+                type="circle"
+                :percent="todayProgress"
+                :size="72"
+                :stroke-color="todayProgress === 100 ? '#52c41a' : '#1890ff'"
+              >
+                <template #format="{ percent }">
+                  <span style="font-size: 12px; font-weight: 600;">{{ percent }}%</span>
+                </template>
+              </a-progress>
+              <div class="ring-label">任务完成</div>
+            </div>
+            <div class="ring-item">
+              <a-progress
+                type="circle"
+                :percent="minutesProgress"
+                :size="72"
+                :stroke-color="minutesProgress >= 100 ? '#722ed1' : '#fa8c16'"
+              >
+                <template #format="{ percent }">
+                  <span style="font-size: 12px; font-weight: 600;">{{ percent }}%</span>
+                </template>
+              </a-progress>
+              <div class="ring-label">学习时长</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="minutes-log-box">
+          <span class="log-title">今日学习: <b style="color: #722ed1;">{{ plan.todayStudiedMinutes || 0 }}分钟</b> / {{ formatGoal(plan.dailyGoalMinutes) }}</span>
+          <div class="log-input-row">
+            <a-input-number
+              v-model:value="logMinutes"
+              :min="0"
+              :max="plan.dailyGoalMinutes * 2 || 1440"
+              placeholder="今日累计学习"
+              :addon-after="'分钟'"
+              size="small"
+              style="width: 180px;"
+            />
+            <a-button type="primary" size="small" :loading="loggingMinutes" @click="handleLogMinutes">
+              <SaveOutlined /> 记录
+            </a-button>
           </div>
         </div>
 
@@ -233,7 +291,6 @@ const formatGoal = (minutes) => {
         </div>
       </div>
 
-      <!-- ARCHIVED MODE -->
       <div v-else-if="mode === 'archived'" class="archived-section">
         <a-alert
           message="该考试已开始或结束，备考计划已归档为只读"
@@ -248,7 +305,38 @@ const formatGoal = (minutes) => {
               <span>每日目标: <b>{{ formatGoal(plan.dailyGoalMinutes) }}</b></span>
             </div>
             <div class="meta-item">
+              <span>今日已学: <b>{{ plan.todayStudiedMinutes || 0 }}分钟</b></span>
+            </div>
+            <div class="meta-item">
               <span>连续打卡: <b>{{ plan.streakDays }}天</b></span>
+            </div>
+          </div>
+          <div class="progress-rings">
+            <div class="ring-item">
+              <a-progress
+                type="circle"
+                :percent="todayProgress"
+                :size="72"
+                :stroke-color="todayProgress === 100 ? '#52c41a' : '#1890ff'"
+              >
+                <template #format="{ percent }">
+                  <span style="font-size: 12px; font-weight: 600;">{{ percent }}%</span>
+                </template>
+              </a-progress>
+              <div class="ring-label">任务完成</div>
+            </div>
+            <div class="ring-item">
+              <a-progress
+                type="circle"
+                :percent="minutesProgress"
+                :size="72"
+                :stroke-color="minutesProgress >= 100 ? '#722ed1' : '#fa8c16'"
+              >
+                <template #format="{ percent }">
+                  <span style="font-size: 12px; font-weight: 600;">{{ percent }}%</span>
+                </template>
+              </a-progress>
+              <div class="ring-label">学习时长</div>
             </div>
           </div>
         </div>
@@ -273,10 +361,11 @@ const formatGoal = (minutes) => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 12px 16px;
-  background: #fafafa;
+  padding: 16px 20px;
+  background: linear-gradient(135deg, #f6ffed 0%, #e6f7ff 100%);
   border-radius: 8px;
-  margin-bottom: 8px;
+  margin-bottom: 12px;
+  border: 1px solid #b7eb8f;
 }
 .plan-meta {
   display: flex;
@@ -290,13 +379,36 @@ const formatGoal = (minutes) => {
   font-size: 14px;
   color: #555;
 }
-.progress-ring-wrapper {
+.progress-rings {
+  display: flex;
+  gap: 24px;
+}
+.ring-item {
   text-align: center;
 }
-.progress-label {
+.ring-label {
   font-size: 12px;
   color: #999;
-  margin-top: 4px;
+  margin-top: 2px;
+}
+.minutes-log-box {
+  background: #f9f0ff;
+  border: 1px solid #d3adf7;
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin-bottom: 4px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+}
+.log-title {
+  font-size: 14px;
+  color: #531dab;
+}
+.log-input-row {
+  display: flex;
+  gap: 8px;
 }
 .task-list {
   display: flex;

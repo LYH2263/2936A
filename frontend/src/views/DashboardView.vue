@@ -750,20 +750,36 @@ const refreshStudyPlans = async () => {
                           </span>
                         </div>
                         <div class="sp-task-progress">
-                          今日任务: {{ card.completedTasksToday }}/{{ card.totalTasksToday }}
+                          任务: {{ card.completedTasksToday }}/{{ card.totalTasksToday }} ｜ 时长: {{ card.todayStudiedMinutes || 0 }}/{{ card.dailyGoalMinutes || 0 }}分
                         </div>
                       </div>
-                      <div class="sp-ring">
-                        <a-progress
-                          type="circle"
-                          :percent="Math.round(card.todayProgress || 0)"
-                          :size="64"
-                          :stroke-color="card.todayProgress >= 100 ? '#52c41a' : '#1890ff'"
-                        >
-                          <template #format="{ percent }">
-                            <span style="font-size: 13px; font-weight: 600;">{{ percent }}%</span>
-                          </template>
-                        </a-progress>
+                      <div class="sp-rings">
+                        <div class="sp-ring">
+                          <a-progress
+                            type="circle"
+                            :percent="Math.round(card.todayProgress || 0)"
+                            :size="48"
+                            :stroke-color="card.todayProgress >= 100 ? '#52c41a' : '#1890ff'"
+                          >
+                            <template #format="{ percent }">
+                              <span style="font-size: 10px; font-weight: 600;">{{ percent }}%</span>
+                            </template>
+                          </a-progress>
+                          <div class="sp-ring-sub">任务</div>
+                        </div>
+                        <div class="sp-ring">
+                          <a-progress
+                            type="circle"
+                            :percent="Math.round(card.minutesProgress || 0)"
+                            :size="48"
+                            :stroke-color="card.minutesProgress >= 100 ? '#722ed1' : '#fa8c16'"
+                          >
+                            <template #format="{ percent }">
+                              <span style="font-size: 10px; font-weight: 600;">{{ percent }}%</span>
+                            </template>
+                          </a-progress>
+                          <div class="sp-ring-sub">时长</div>
+                        </div>
                       </div>
                     </div>
                   </a-card>
@@ -1269,6 +1285,7 @@ const refreshStudyPlans = async () => {
       :examId="studyPlanExamId"
       :examTitle="studyPlanExamTitle"
       @created="refreshStudyPlans"
+      @update:open="(v) => { if (!v) refreshStudyPlans(); }"
     />
 
     <!-- Comment Template Modal -->
@@ -1447,8 +1464,18 @@ const refreshStudyPlans = async () => {
   font-size: 12px;
   color: #999;
 }
-.sp-ring {
+.sp-rings {
   flex-shrink: 0;
+  display: flex;
+  gap: 10px;
+}
+.sp-ring {
+  text-align: center;
+}
+.sp-ring-sub {
+  font-size: 11px;
+  color: #999;
+  margin-top: 1px;
 }
 .badge-wall-section {
   margin-top: 24px;

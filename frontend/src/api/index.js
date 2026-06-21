@@ -137,6 +137,7 @@ export const getStudyPlanDashboard = () => api.get('/study-plans/dashboard');
 export const checkInStudyPlanTask = (planId, data) => api.post(`/study-plans/${planId}/check-in`, data);
 export const addStudyPlanTask = (planId, data) => api.post(`/study-plans/${planId}/tasks`, data);
 export const deleteStudyPlanTask = (planId, taskId) => api.delete(`/study-plans/${planId}/tasks/${taskId}`);
+export const logStudyPlanMinutes = (planId, data) => api.post(`/study-plans/${planId}/log-minutes`, data);
 
 // Comment Templates
 export const getCommentTemplates = (subject) => api.get('/comment-templates', { params: subject ? { subject } : {} });

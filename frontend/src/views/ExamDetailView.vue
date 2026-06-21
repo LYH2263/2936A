@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, computed, watch } from 'vue';
+import { ref, onMounted, onUnmounted, computed, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { getExam, getExamQuestions, getStudentAnnouncements, getAnnouncementUnreadCount, markAnnouncementRead, markAllAnnouncementsRead } from '@/api';
 import { 
@@ -105,7 +105,45 @@ const totalScore = computed(() => questions.value.reduce((sum, q) => sum + (q.sc
 
 const formatTime = (t) => t ? new Date(t).toLocaleString() : '-';
 
-onMounted(fetchData);
+const countdown = ref({ days: 0, hours: 0, minutes: 0, seconds: 0 });
+let countdownTimer = null;
+
+const updateCountdown = () => {
+  if (!exam.value?.startTime) return;
+  const now = new Date();
+  const start = new Date(exam.value.startTime);
+  const diff = start - now;
+  if (diff <= 0) {
+    countdown.value = { days: 0, hours: 0, minutes: 0, seconds: 0 };
+    return;
+  }
+  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+  const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+  const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+  const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+  countdown.value = { days, hours, minutes, seconds };
+};
+
+const formatCountdown = () => {
+  const { days, hours, minutes, seconds } = countdown.value;
+  const hh = String(hours).padStart(2, '0');
+  const mm = String(minutes).padStart(2, '0');
+  const ss = String(seconds).padStart(2, '0');
+  if (days > 0) {
+    return `距离开考还有 ${days}天 ${hh}:${mm}:${ss}`;
+  }
+  return `距离开考还有 ${hh}:${mm}:${ss}`;
+};
+
+onMounted(() => {
+  fetchData();
+  updateCountdown();
+  countdownTimer = setInterval(updateCountdown, 1000);
+});
+
+onUnmounted(() => {
+  if (countdownTimer) clearInterval(countdownTimer);
+});
 
 const startExam = () => {
   router.push(`/exam/${examId}`);
@@ -267,8 +305,8 @@ const showStudyPlan = () => {
               </a-list>
               
               <div class="start-action">
-                <div v-if="status.text === '未开始'" class="countdown-hint">
-                  <ClockCircleOutlined /> 距离开考还有 24:00:00
+                <div v-if="status.text === '未开始' && exam.startTime" class="countdown-hint">
+                  <ClockCircleOutlined /> {{ formatCountdown() }}
                 </div>
                 <a-button
                   v-if="isStudent"

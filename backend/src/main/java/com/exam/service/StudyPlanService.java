@@ -3,9 +3,11 @@ package com.exam.service;
 import com.exam.dto.StudyPlanDTO;
 import com.exam.entity.Exam;
 import com.exam.entity.StudyPlan;
+import com.exam.entity.StudyPlanLog;
 import com.exam.entity.StudyPlanTask;
 import com.exam.entity.User;
 import com.exam.repository.ExamRepository;
+import com.exam.repository.StudyPlanLogRepository;
 import com.exam.repository.StudyPlanRepository;
 import com.exam.repository.StudyPlanTaskRepository;
 import com.exam.repository.UserRepository;
@@ -24,15 +26,18 @@ public class StudyPlanService {
 
     private final StudyPlanRepository studyPlanRepository;
     private final StudyPlanTaskRepository studyPlanTaskRepository;
+    private final StudyPlanLogRepository studyPlanLogRepository;
     private final ExamRepository examRepository;
     private final UserRepository userRepository;
 
     public StudyPlanService(StudyPlanRepository studyPlanRepository,
                             StudyPlanTaskRepository studyPlanTaskRepository,
+                            StudyPlanLogRepository studyPlanLogRepository,
                             ExamRepository examRepository,
                             UserRepository userRepository) {
         this.studyPlanRepository = studyPlanRepository;
         this.studyPlanTaskRepository = studyPlanTaskRepository;
+        this.studyPlanLogRepository = studyPlanLogRepository;
         this.examRepository = examRepository;
         this.userRepository = userRepository;
     }
@@ -115,6 +120,13 @@ public class StudyPlanService {
             card.setTodayProgress(total > 0 ? (double) completed / total * 100 : 0);
             card.setStreakDays(calculateStreak(plan.getId(), tasks));
 
+            card.setDailyGoalMinutes(plan.getDailyGoalMinutes());
+            StudyPlanLog log = studyPlanLogRepository.findByPlanIdAndLogDate(plan.getId(), LocalDate.now()).orElse(null);
+            int studied = log != null ? (log.getStudiedMinutes() != null ? log.getStudiedMinutes() : 0) : 0;
+            card.setTodayStudiedMinutes(studied);
+            int goal = plan.getDailyGoalMinutes() != null ? plan.getDailyGoalMinutes() : 0;
+            card.setMinutesProgress(goal > 0 ? Math.min(100.0, (double) studied / goal * 100) : 0);
+
             cards.add(card);
         }
         return cards;
@@ -123,17 +135,17 @@ public class StudyPlanService {
     @Transactional
     public StudyPlanDTO checkIn(String username, Long planId, StudyPlanDTO.CheckInRequest request) {
         User user = userRepository.findByUsername(username).orElseThrow();
-        StudyPlan plan = studyPlanRepository.findById(planId).orElseThrow();
+        StudyPlan plan = studyPlanRepository.findById(planId).orElseThrow(() -> new RuntimeException("计划不存在"));
         if (!plan.getUser().getId().equals(user.getId())) {
-            throw new RuntimeException("无权操作");
+            throw new RuntimeException("无权操作该备考计划");
         }
         if ("ARCHIVED".equals(plan.getStatus())) {
-            throw new RuntimeException("计划已归档，无法打卡");
+            throw new RuntimeException("备考计划已归档，无法打卡");
         }
 
-        StudyPlanTask task = studyPlanTaskRepository.findById(request.getTaskId()).orElseThrow();
+        StudyPlanTask task = studyPlanTaskRepository.findById(request.getTaskId()).orElseThrow(() -> new RuntimeException("任务不存在"));
         if (!task.getPlan().getId().equals(planId)) {
-            throw new RuntimeException("任务不属于该计划");
+            throw new RuntimeException("任务不属于该备考计划");
         }
 
         String today = LocalDate.now().toString();
@@ -146,12 +158,12 @@ public class StudyPlanService {
     @Transactional
     public StudyPlanDTO addTask(String username, Long planId, StudyPlanDTO.AddTaskRequest request) {
         User user = userRepository.findByUsername(username).orElseThrow();
-        StudyPlan plan = studyPlanRepository.findById(planId).orElseThrow();
+        StudyPlan plan = studyPlanRepository.findById(planId).orElseThrow(() -> new RuntimeException("计划不存在"));
         if (!plan.getUser().getId().equals(user.getId())) {
-            throw new RuntimeException("无权操作");
+            throw new RuntimeException("无权操作该备考计划");
         }
         if ("ARCHIVED".equals(plan.getStatus())) {
-            throw new RuntimeException("计划已归档，无法添加任务");
+            throw new RuntimeException("备考计划已归档，无法添加任务");
         }
 
         List<StudyPlanTask> existing = studyPlanTaskRepository.findByPlanIdOrderBySortOrderAsc(planId);
@@ -165,16 +177,55 @@ public class StudyPlanService {
     }
 
     @Transactional
-    public void deleteTask(String username, Long planId, Long taskId) {
+    public StudyPlanDTO deleteTask(String username, Long planId, Long taskId) {
         User user = userRepository.findByUsername(username).orElseThrow();
-        StudyPlan plan = studyPlanRepository.findById(planId).orElseThrow();
+        StudyPlan plan = studyPlanRepository.findById(planId).orElseThrow(() -> new RuntimeException("计划不存在"));
         if (!plan.getUser().getId().equals(user.getId())) {
-            throw new RuntimeException("无权操作");
+            throw new RuntimeException("无权操作该备考计划");
         }
         if ("ARCHIVED".equals(plan.getStatus())) {
-            throw new RuntimeException("计划已归档，无法删除任务");
+            throw new RuntimeException("备考计划已归档，无法删除任务");
         }
-        studyPlanTaskRepository.deleteById(taskId);
+
+        StudyPlanTask task = studyPlanTaskRepository.findById(taskId).orElseThrow(() -> new RuntimeException("任务不存在"));
+        if (!task.getPlan().getId().equals(planId)) {
+            throw new RuntimeException("任务不属于该备考计划");
+        }
+
+        studyPlanTaskRepository.delete(task);
+
+        return toDTO(plan);
+    }
+
+    @Transactional
+    public StudyPlanDTO logMinutes(String username, Long planId, StudyPlanDTO.LogMinutesRequest request) {
+        User user = userRepository.findByUsername(username).orElseThrow();
+        StudyPlan plan = studyPlanRepository.findById(planId).orElseThrow(() -> new RuntimeException("计划不存在"));
+        if (!plan.getUser().getId().equals(user.getId())) {
+            throw new RuntimeException("无权操作该备考计划");
+        }
+        if ("ARCHIVED".equals(plan.getStatus())) {
+            throw new RuntimeException("备考计划已归档，无法记录学习时长");
+        }
+
+        if (request.getMinutes() == null || request.getMinutes() < 0) {
+            throw new RuntimeException("无效的学习时长");
+        }
+
+        LocalDate today = LocalDate.now();
+        StudyPlanLog log = studyPlanLogRepository.findByPlanIdAndLogDate(planId, today).orElse(null);
+        if (log == null) {
+            log = new StudyPlanLog();
+            log.setPlan(plan);
+            log.setLogDate(today);
+            log.setStudiedMinutes(Math.min(request.getMinutes(), plan.getDailyGoalMinutes() != null ? plan.getDailyGoalMinutes() * 2 : request.getMinutes()));
+        } else {
+            int capped = plan.getDailyGoalMinutes() != null ? Math.min(plan.getDailyGoalMinutes() * 2, request.getMinutes()) : request.getMinutes();
+            log.setStudiedMinutes(capped);
+        }
+        studyPlanLogRepository.save(log);
+
+        return toDTO(plan);
     }
 
     private void archiveIfNeeded(StudyPlan plan) {
@@ -195,8 +246,17 @@ public class StudyPlanService {
         LocalDate checkDate = LocalDate.now();
         String today = checkDate.toString();
 
-        boolean todayHasAny = tasks.stream().anyMatch(t -> t.isCompletedOn(today));
-        if (!todayHasAny) {
+        boolean todayAllDone = !tasks.isEmpty() && tasks.stream().allMatch(t -> t.isCompletedOn(today));
+        StudyPlan todayLog = studyPlanRepository.findById(planId).orElse(null);
+        boolean todayMinutesMet = false;
+        if (todayLog != null && todayLog.getDailyGoalMinutes() != null) {
+            StudyPlanLog log = studyPlanLogRepository.findByPlanIdAndLogDate(planId, LocalDate.now()).orElse(null);
+            int studied = log != null && log.getStudiedMinutes() != null ? log.getStudiedMinutes() : 0;
+            todayMinutesMet = studied >= todayLog.getDailyGoalMinutes();
+        }
+        boolean todayQualified = todayAllDone && todayMinutesMet;
+
+        if (!todayQualified) {
             checkDate = checkDate.minusDays(1);
         }
 
@@ -206,14 +266,22 @@ public class StudyPlanService {
             if (plan != null && plan.getCreatedAt() != null && checkDate.isBefore(plan.getCreatedAt().toLocalDate())) {
                 break;
             }
-            boolean allDone = true;
-            boolean anyDone = false;
+            boolean allTasksDone = !tasks.isEmpty();
             for (StudyPlanTask t : tasks) {
-                boolean done = t.isCompletedOn(dateStr);
-                if (done) anyDone = true;
-                else allDone = false;
+                if (!t.isCompletedOn(dateStr)) {
+                    allTasksDone = false;
+                    break;
+                }
             }
-            if (allDone && (anyDone || !tasks.isEmpty())) {
+
+            boolean minutesMet = true;
+            if (plan != null && plan.getDailyGoalMinutes() != null) {
+                StudyPlanLog log = studyPlanLogRepository.findByPlanIdAndLogDate(planId, checkDate).orElse(null);
+                int studied = log != null && log.getStudiedMinutes() != null ? log.getStudiedMinutes() : 0;
+                minutesMet = studied >= plan.getDailyGoalMinutes();
+            }
+
+            if (allTasksDone && minutesMet) {
                 streak++;
                 checkDate = checkDate.minusDays(1);
             } else {
@@ -255,6 +323,13 @@ public class StudyPlanService {
         }
         dto.setTasks(taskItems);
         dto.setTodayProgress(tasks.isEmpty() ? 0 : (double) completedToday / tasks.size() * 100);
+
+        StudyPlanLog log = studyPlanLogRepository.findByPlanIdAndLogDate(plan.getId(), LocalDate.now()).orElse(null);
+        int studied = log != null && log.getStudiedMinutes() != null ? log.getStudiedMinutes() : 0;
+        dto.setTodayStudiedMinutes(studied);
+        int goal = plan.getDailyGoalMinutes() != null ? plan.getDailyGoalMinutes() : 0;
+        dto.setMinutesProgress(goal > 0 ? Math.min(100.0, (double) studied / goal * 100) : 0);
+
         dto.setStreakDays(calculateStreak(plan.getId(), tasks));
 
         return dto;
