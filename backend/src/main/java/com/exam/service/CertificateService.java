@@ -15,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.awt.Color;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.InputStream;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Map;
@@ -57,6 +58,12 @@ public class CertificateService {
                 }
             } catch (Exception ignored) {}
         }
+        try (InputStream is = getClass().getResourceAsStream("/fonts/wqy-microhei.ttc")) {
+            if (is != null) {
+                baseFont = BaseFont.createFont("wqy-microhei.ttc", BaseFont.IDENTITY_H, BaseFont.EMBEDDED, true, is.readAllBytes(), null);
+                return;
+            }
+        } catch (Exception ignored) {}
         try {
             baseFont = BaseFont.createFont(BaseFont.HELVETICA, BaseFont.WINANSI, BaseFont.EMBEDDED);
         } catch (Exception e) {

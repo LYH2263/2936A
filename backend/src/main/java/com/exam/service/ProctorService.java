@@ -93,6 +93,8 @@ public class ProctorService {
         summary.setOnlineCount(inProgressSubmissions.size());
         summary.setSubmittedCount(submittedSubmissions.size());
         summary.setAnomalyCount(anomalyCount);
+        summary.setAllowTabSwitch(exam.getAllowTabSwitch());
+        summary.setTabSwitchLimit(exam.getTabSwitchLimit());
         summary.setStudents(students);
         
         return summary;

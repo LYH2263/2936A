@@ -108,6 +108,14 @@ const onlineCount = computed(() => proctorData.value?.onlineCount || 0);
 const submittedCount = computed(() => proctorData.value?.submittedCount || 0);
 const anomalyCount = computed(() => proctorData.value?.anomalyCount || 0);
 
+const isTabSwitchExcess = (student) => {
+  if (student.anomalyType === 'EXCESS_TAB_SWITCH') return true;
+  if (proctorData.value?.allowTabSwitch !== false) return false;
+  const limit = proctorData.value?.tabSwitchLimit;
+  if (limit == null) return false;
+  return (student.tabSwitchCount || 0) >= limit;
+};
+
 onMounted(() => {
   fetchProctorData();
   pollingInterval.value = setInterval(fetchProctorData, 5000);
@@ -241,7 +249,7 @@ onUnmounted(() => {
             {{ formatLastActive(student.lastActiveTime) }}
           </div>
           <div class="col-tab">
-            <span :class="{ 'tab-excess': student.tabSwitchCount >= 5 }">
+            <span :class="{ 'tab-excess': isTabSwitchExcess(student) }">
               {{ student.tabSwitchCount }}
             </span>
           </div>

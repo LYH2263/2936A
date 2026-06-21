@@ -46,19 +46,33 @@ const difficultyOptions = [
   { value: 5, label: '困难' }
 ];
 
+const scrollToHighlight = async () => {
+  if (!highlightId.value) return;
+  await nextTick();
+  const row = document.getElementById(`question-row-${highlightId.value}`);
+  if (row) {
+    row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    highlightedRow.value = highlightId.value;
+    setTimeout(() => { highlightedRow.value = null; }, 3000);
+  }
+};
+
 const fetchQuestions = async () => {
   loading.value = true;
   try {
     const res = await getAllQuestions();
     questions.value = res.data;
-    
+
     if (highlightId.value) {
-      await nextTick();
-      const row = document.getElementById(`question-row-${highlightId.value}`);
-      if (row) {
-        row.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        highlightedRow.value = highlightId.value;
-        setTimeout(() => { highlightedRow.value = null; }, 3000);
+      filterSubject.value = '';
+      filterType.value = null;
+      filterDifficulty.value = null;
+      filterText.value = '';
+      const target = questions.value.find(q => q.id === highlightId.value);
+      if (target) {
+        startEdit(target);
+        await nextTick();
+        await scrollToHighlight();
       }
     }
   } catch (e) {

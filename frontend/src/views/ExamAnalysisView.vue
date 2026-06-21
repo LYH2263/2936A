@@ -141,7 +141,7 @@ const initDifficultyCompareChart = () => {
     const xData = data.map(q => `Q${q.sequence}`);
     const presetData = data.map(q => q.presetDifficulty || 0);
     const perceivedData = data.map(q => {
-        if (q.perceivedDifficultyCount >= 10) {
+        if (q.perceivedDifficultyCount > 0) {
             return q.perceivedDifficultyAverage || 0;
         }
         return null;
@@ -156,8 +156,10 @@ const initDifficultyCompareChart = () => {
             params.forEach(p => {
                 const q = data[p.dataIndex];
                 if (p.seriesName === '学生体感难度') {
-                    if (q.perceivedDifficultyCount < 10) {
-                        result += `${p.marker} ${p.seriesName}: 样本不足 (${q.perceivedDifficultyCount}人评)<br/>`;
+                    if (q.perceivedDifficultyCount <= 0 || p.value == null) {
+                        result += `${p.marker} ${p.seriesName}: 暂无评分<br/>`;
+                    } else if (q.perceivedDifficultyCount < 10) {
+                        result += `${p.marker} ${p.seriesName}: ${p.value.toFixed(2)} (${q.perceivedDifficultyCount}人评，样本不足)<br/>`;
                     } else {
                         result += `${p.marker} ${p.seriesName}: ${p.value.toFixed(2)} (${q.perceivedDifficultyCount}人评)<br/>`;
                     }

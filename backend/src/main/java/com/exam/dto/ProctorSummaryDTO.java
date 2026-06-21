@@ -8,6 +8,8 @@ public class ProctorSummaryDTO {
     private int onlineCount;
     private int submittedCount;
     private int anomalyCount;
+    private Boolean allowTabSwitch;
+    private Integer tabSwitchLimit;
     private List<ProctorStudentDTO> students;
 
     public Long getExamId() { return examId; }
@@ -27,4 +29,10 @@ public class ProctorSummaryDTO {
 
     public List<ProctorStudentDTO> getStudents() { return students; }
     public void setStudents(List<ProctorStudentDTO> students) { this.students = students; }
+
+    public Boolean getAllowTabSwitch() { return allowTabSwitch; }
+    public void setAllowTabSwitch(Boolean allowTabSwitch) { this.allowTabSwitch = allowTabSwitch; }
+
+    public Integer getTabSwitchLimit() { return tabSwitchLimit; }
+    public void setTabSwitchLimit(Integer tabSwitchLimit) { this.tabSwitchLimit = tabSwitchLimit; }
 }

@@ -8,6 +8,10 @@ RUN mvn -s /usr/share/maven/ref/settings.xml package -DskipTests -Dmaven.wagon.h
 
 # Run Stage
 FROM eclipse-temurin:17-jre
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends fontconfig fonts-wqy-microhei && \
+    fc-cache -fv && \
+    rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY --from=build /app/target/*.jar app.jar
 EXPOSE 8080
