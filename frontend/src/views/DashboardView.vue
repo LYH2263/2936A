@@ -489,6 +489,16 @@ const fetchCertEligibility = async () => {
   }
 };
 
+const getSubmissionByExamId = (examId) => {
+  return submissions.value.find(s => s.exam?.id === examId && s.state === 'SUBMITTED');
+};
+
+const getExamCertInfo = (examId) => {
+  const sub = getSubmissionByExamId(examId);
+  if (!sub) return null;
+  return certEligibility.value[sub.id] || null;
+};
+
 const handleDownloadCert = async (sub) => {
   certLoading.value[sub.id] = true;
   try {
@@ -510,9 +520,23 @@ const handleDownloadCert = async (sub) => {
   }
 };
 
+const handleDownloadCertByExam = async (exam) => {
+  const sub = getSubmissionByExamId(exam.id);
+  if (sub) {
+    await handleDownloadCert(sub);
+  }
+};
+
 const handleCertTooltip = (sub) => {
   const info = certEligibility.value[sub.id];
   if (!info) return '查询中...';
+  if (info.eligible) return '点击下载合格证书';
+  return info.reason || '不可下载';
+};
+
+const handleExamCertTooltip = (exam) => {
+  const info = getExamCertInfo(exam.id);
+  if (!info) return '尚未考试';
   if (info.eligible) return '点击下载合格证书';
   return info.reason || '不可下载';
 };
@@ -959,7 +983,23 @@ const refreshStudyPlans = async () => {
                              </a-button>
                          </div>
                          <div v-else>
-                            <a-button type="primary" block>查看详情</a-button>
+                            <a-space style="width: 100%;">
+                               <a-button type="primary" block @click="showDetail(item)">查看详情</a-button>
+                               <template v-if="getExamCertInfo(item.id)?.enableCert && getSubmissionByExamId(item.id)">
+                                  <a-tooltip :title="handleExamCertTooltip(item)">
+                                     <a-button
+                                        :type="getExamCertInfo(item.id)?.eligible ? 'primary' : 'default'"
+                                        :disabled="!getExamCertInfo(item.id)?.eligible"
+                                        :loading="certLoading[getSubmissionByExamId(item.id)?.id]"
+                                        size="small"
+                                        @click.stop="handleDownloadCertByExam(item)"
+                                        :ghost="!getExamCertInfo(item.id)?.eligible"
+                                     >
+                                        <SafetyCertificateOutlined /> 下载证书
+                                     </a-button>
+                                  </a-tooltip>
+                               </template>
+                            </a-space>
                          </div>
                       </template>
                     </a-card>
@@ -1002,32 +1042,30 @@ const refreshStudyPlans = async () => {
                { title: '总分', dataIndex: 'examTotalScore', key: 'examTotalScore', customRender: ({text}) => text + ' 分' },
                { title: '排名', dataIndex: 'ranking', key: 'ranking', customRender: ({text}) => text ? `第 ${text} 名` : '未排名' },
                { title: '状态', dataIndex: 'state', key: 'state', customRender: ({text}) => text === 'SUBMITTED' ? '已提交' : (text === 'IN_PROGRESS' ? '进行中' : text) },
-               { title: '操作', key: 'action', width: 200 }
+               { title: '操作', key: 'action', width: 260 }
              ]">
                <template #bodyCell="{ column, record }">
                  <template v-if="column.key === 'action'">
-                    <a-space>
-                      <a-button type="link" size="small" @click="router.push(`/score/${record.id}`)">
-                        查看解析
-                      </a-button>
-                      <a-tooltip v-if="certEligibility[record.id]" :title="handleCertTooltip(record)">
-                        <a-button
-                          type="primary"
-                          size="small"
-                          :disabled="!certEligibility[record.id]?.eligible"
-                          :loading="certLoading[record.id]"
-                          @click="handleDownloadCert(record)"
-                        >
-                          <SafetyCertificateOutlined /> 下载证书
-                        </a-button>
-                      </a-tooltip>
-                      <a-button
-                        v-else-if="record.state === 'SUBMITTED' && certEligibility[record.id] === undefined"
-                        size="small"
-                        disabled
-                      >
-                        <SafetyCertificateOutlined /> 检查中...
-                      </a-button>
+                    <a-space direction="vertical" size="small" style="width: 100%;">
+                       <a-space>
+                         <a-button type="link" size="small" @click="router.push(`/score/${record.id}`)">
+                           查看解析
+                         </a-button>
+                         <a-tooltip v-if="certEligibility[record.id]?.enableCert" :title="handleCertTooltip(record)">
+                           <a-button
+                             type="primary"
+                             size="small"
+                             :disabled="!certEligibility[record.id]?.eligible"
+                             :loading="certLoading[record.id]"
+                             @click="handleDownloadCert(record)"
+                           >
+                             <SafetyCertificateOutlined /> 下载证书
+                           </a-button>
+                         </a-tooltip>
+                       </a-space>
+                       <div v-if="certEligibility[record.id]?.certificateNo" style="font-size: 12px; color: #999;">
+                         证书编号：{{ certEligibility[record.id].certificateNo }}
+                       </div>
                     </a-space>
                  </template>
                </template>

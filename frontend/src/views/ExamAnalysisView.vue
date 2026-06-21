@@ -315,6 +315,12 @@ const handleTabChange = (key) => {
                 <div class="value" :style="{ color: stats.passRate >= 60 ? '#52c41a' : '#f5222d' }">
                   {{ stats.passRate.toFixed(1) }}%
                 </div>
+                <div v-if="stats.enableCert" class="sub-label">
+                  合格线：{{ stats.certPassScore }} 分
+                </div>
+                <div v-else class="sub-label">
+                  合格线：满分的 60%
+                </div>
               </div>
             </div>
           </a-col>
@@ -528,6 +534,11 @@ const handleTabChange = (key) => {
   font-size: 14px;
   color: #bfbfbf;
   font-weight: normal;
+}
+.card-info .sub-label {
+  font-size: 12px;
+  color: #8c8c8c;
+  margin-top: 6px;
 }
 
 /* Charts & Tables */

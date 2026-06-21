@@ -25,8 +25,8 @@ public class CertificateController {
     }
 
     @GetMapping("/download/{examId}/{submissionId}")
-    public ResponseEntity<byte[]> downloadCertificate(@PathVariable Long examId, @PathVariable Long submissionId) {
-        byte[] pdfData = certificateService.generateCertificatePdf(examId, submissionId);
+    public ResponseEntity<byte[]> downloadCertificate(@PathVariable Long examId, @PathVariable Long submissionId, Principal principal) {
+        byte[] pdfData = certificateService.generateCertificatePdf(examId, submissionId, principal.getName());
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=certificate_EXAM-" + examId + "-" + submissionId + ".pdf")
                 .header(HttpHeaders.CONTENT_TYPE, "application/pdf")

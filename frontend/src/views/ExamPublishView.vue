@@ -20,6 +20,7 @@ const exam = ref(null);
 const formRef1 = ref();
 const formRef2 = ref();
 const formRef3 = ref();
+const formRef4 = ref();
 
 const formState = reactive({
   title: '',
@@ -78,6 +79,7 @@ const next = async () => {
   try {
     if (currentStep.value === 0) await formRef1.value.validateFields();
     if (currentStep.value === 1) await formRef2.value.validateFields();
+    if (currentStep.value === 2) await formRef3.value.validateFields();
     currentStep.value++;
   } catch (e) {
     // Validation fails locally
@@ -91,6 +93,9 @@ const prev = () => {
 const handlePublish = async () => {
   try {
     await formRef3.value.validateFields();
+    if (formState.enableCert) {
+      await formRef4.value.validateFields();
+    }
     loading.value = true;
     
     const payload = {
@@ -257,7 +262,7 @@ const steps = [
           <!-- Step 4: Certificate -->
           <div v-show="currentStep === 3" class="step-content">
              <div class="section-title">🎓 电子合格证书</div>
-             <a-form :model="formState" layout="vertical">
+             <a-form ref="formRef4" :model="formState" layout="vertical">
                 <a-card size="small" title="证书开关">
                    <a-form-item label="启用合格证书">
                       <a-switch v-model:checked="formState.enableCert" />

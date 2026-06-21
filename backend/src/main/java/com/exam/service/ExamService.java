@@ -168,6 +168,16 @@ public class ExamService {
         if (details.getTargetAudience() != null) exam.setTargetAudience(details.getTargetAudience());
         if (details.getTargetIds() != null) exam.setTargetIds(details.getTargetIds());
 
+        // Certificate validation
+        Boolean newEnableCert = details.getEnableCert() != null ? details.getEnableCert() : exam.getEnableCert();
+        if (Boolean.TRUE.equals(newEnableCert)) {
+            String newIssuer = details.getCertIssuer() != null && !details.getCertIssuer().isBlank()
+                    ? details.getCertIssuer() : exam.getCertIssuer();
+            if (newIssuer == null || newIssuer.isBlank()) {
+                throw new RuntimeException("启用合格证书时，发证单位不能为空");
+            }
+        }
+
         // Update Certificate
         if (details.getEnableCert() != null) exam.setEnableCert(details.getEnableCert());
         if (details.getCertTitle() != null) exam.setCertTitle(details.getCertTitle());
@@ -254,7 +264,12 @@ public class ExamService {
         dist.put("90-100", 0);
         
         int totalPossibleScore = examQuestions.stream().mapToInt(ExamQuestion::getScore).sum();
-        int passScore = (int) (totalPossibleScore * 0.6);
+        int passScore;
+        if (Boolean.TRUE.equals(exam.getEnableCert()) && exam.getCertPassScore() != null) {
+            passScore = exam.getCertPassScore();
+        } else {
+            passScore = (int) (totalPossibleScore * 0.6);
+        }
         
         // Rankings
         List<com.exam.dto.ExamStatistics.StudentRanking> rankings = new java.util.ArrayList<>();
