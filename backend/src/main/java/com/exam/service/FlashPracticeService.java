@@ -60,7 +60,7 @@ public class FlashPracticeService {
         session.setStudent(student);
         session.setSubject(subject);
         session.setDifficulty(difficulty);
-        session.setKnowledgePoint(knowledgePoint != null && knowledgePoint.isEmpty() ? null : knowledgePoint);
+        session.setKnowledgePoint((knowledgePoint != null && !knowledgePoint.isEmpty()) ? knowledgePoint : null);
         session.setPracticeDate(LocalDate.now());
         session.setStartTime(LocalDateTime.now());
         session.setTotalQuestions(0);
@@ -72,31 +72,47 @@ public class FlashPracticeService {
         return sessionRepository.save(session);
     }
 
-    public Question getNextQuestion(Long sessionId) {
+    private void assertOwner(FlashPracticeSession session, String username) {
+        if (session.getStudent() == null || !username.equals(session.getStudent().getUsername())) {
+            throw new SecurityException("无权访问该练习记录");
+        }
+    }
+
+    public Question getNextQuestion(Long sessionId, String username) {
         FlashPracticeSession session = sessionRepository.findById(sessionId)
-                .orElseThrow(() -> new RuntimeException("Session not found"));
+                .orElseThrow(() -> new RuntimeException("练习会话不存在"));
+        assertOwner(session, username);
 
         Set<Long> answeredIds = parseAnsweredIds(session.getAnsweredQuestionIds());
 
-        List<Question> candidates = questionRepository.findRandomCandidates(
-                session.getSubject(),
-                session.getDifficulty(),
-                session.getKnowledgePoint(),
-                answeredIds
-        );
-
-        if (candidates.isEmpty()) {
-            answeredIds.clear();
-            candidates = questionRepository.findRandomCandidates(
+        List<Question> candidates;
+        if (answeredIds.isEmpty()) {
+            candidates = questionRepository.findAllCandidates(
+                    session.getSubject(),
+                    session.getDifficulty(),
+                    session.getKnowledgePoint()
+            );
+        } else {
+            candidates = questionRepository.findCandidatesExcluding(
                     session.getSubject(),
                     session.getDifficulty(),
                     session.getKnowledgePoint(),
                     answeredIds
             );
+            if (candidates.isEmpty()) {
+                candidates = questionRepository.findAllCandidates(
+                        session.getSubject(),
+                        session.getDifficulty(),
+                        session.getKnowledgePoint()
+                );
+            }
         }
 
         if (candidates.isEmpty()) {
-            throw new RuntimeException("暂无符合条件的题目，请调整筛选条件");
+            sessionRepository.delete(session);
+            throw new RuntimeException("暂无符合条件的题目（科目:" + session.getSubject()
+                    + " 难度:" + (session.getDifficulty() != null ? session.getDifficulty() : "全部")
+                    + "），请调整筛选条件");
         }
 
         int randomIdx = new Random().nextInt(candidates.size());
@@ -114,14 +130,16 @@ public class FlashPracticeService {
     }
 
     @Transactional
-    public Map<String, Object> submitAnswer(Long sessionId, Long questionId, String studentAnswer) {
+    public Map<String, Object> submitAnswer(Long sessionId, Long questionId, String studentAnswer, String username) {
         FlashPracticeSession session = sessionRepository.findById(sessionId)
-                .orElseThrow(() -> new RuntimeException("Session not found"));
+                .orElseThrow(() -> new RuntimeException("练习会话不存在"));
+        assertOwner(session, username);
 
         Question question = questionRepository.findById(questionId)
-                .orElseThrow(() -> new RuntimeException("Question not found"));
+                .orElseThrow(() -> new RuntimeException("题目不存在"));
 
-        boolean isCorrect = autoGrade(question, studentAnswer);
+        String normalizedAnswer = normalizeJudgeAnswer(question.getType(), studentAnswer);
+        boolean isCorrect = autoGrade(question, normalizedAnswer);
 
         session.setTotalQuestions(session.getTotalQuestions() + 1);
         if (isCorrect) {
@@ -158,16 +176,33 @@ public class FlashPracticeService {
     }
 
     @Transactional
-    public void endSession(Long sessionId) {
+    public void endSession(Long sessionId, String username) {
         FlashPracticeSession session = sessionRepository.findById(sessionId)
-                .orElseThrow(() -> new RuntimeException("Session not found"));
+                .orElse(null);
+        if (session == null) return;
+        assertOwner(session, username);
         session.setEndTime(LocalDateTime.now());
         sessionRepository.save(session);
     }
 
-    public FlashPracticeSession getSession(Long sessionId) {
-        return sessionRepository.findById(sessionId)
-                .orElseThrow(() -> new RuntimeException("Session not found"));
+    public FlashPracticeSession getSession(Long sessionId, String username) {
+        FlashPracticeSession session = sessionRepository.findById(sessionId)
+                .orElseThrow(() -> new RuntimeException("练习会话不存在"));
+        assertOwner(session, username);
+        return session;
+    }
+
+    private String normalizeJudgeAnswer(String type, String answer) {
+        if (answer == null) return null;
+        if (!"JUDGE".equals(type)) return answer;
+        String a = answer.trim();
+        if (a.equalsIgnoreCase("true") || a.equals("对") || a.equals("正确") || a.equals("T") || a.equals("√") || a.equals("是")) {
+            return "TRUE";
+        }
+        if (a.equalsIgnoreCase("false") || a.equals("错") || a.equals("错误") || a.equals("F") || a.equals("×") || a.equals("否")) {
+            return "FALSE";
+        }
+        return answer;
     }
 
     private boolean autoGrade(Question question, String studentAnswer) {
@@ -178,13 +213,17 @@ public class FlashPracticeService {
         if (answer == null) return false;
 
         String type = question.getType();
-        if ("SINGLE".equals(type) || "JUDGE".equals(type)) {
-            return studentAnswer.trim().equals(answer.trim());
+        if ("SINGLE".equals(type)) {
+            return studentAnswer.trim().equalsIgnoreCase(answer.trim());
+        } else if ("JUDGE".equals(type)) {
+            String normedStudent = normalizeJudgeAnswer("JUDGE", studentAnswer);
+            String normedCorrect = normalizeJudgeAnswer("JUDGE", answer);
+            return normedStudent != null && normedStudent.equals(normedCorrect);
         } else if ("MULTI".equals(type)) {
             List<String> userOpts = Arrays.stream(studentAnswer.split(",|\\s+"))
-                    .map(String::trim).filter(s -> !s.isEmpty()).sorted().collect(Collectors.toList());
+                    .map(String::trim).filter(s -> !s.isEmpty()).map(String::toUpperCase).sorted().collect(Collectors.toList());
             List<String> correctOpts = Arrays.stream(answer.split(",|\\s+"))
-                    .map(String::trim).filter(s -> !s.isEmpty()).sorted().collect(Collectors.toList());
+                    .map(String::trim).filter(s -> !s.isEmpty()).map(String::toUpperCase).sorted().collect(Collectors.toList());
             return userOpts.equals(correctOpts);
         } else if ("SHORT".equals(type)) {
             String[] keywords = answer.split(";|\\s+");

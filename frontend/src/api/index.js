@@ -84,7 +84,6 @@ export const autoGenerateExam = (examId, strategy) => api.post(`/exams/${examId}
 export const updateExamQuestion = (examId, questionId, data) => api.put(`/exams/${examId}/questions/${questionId}`, data);
 export const removeQuestionFromExam = (examId, questionId) => api.delete(`/exams/${examId}/questions/${questionId}`);
 export const updateQuestionContent = (questionId, data) => api.put(`/exams/questions/${questionId}`, data);
-export const getAllQuestions = () => api.get('/exams/questions');
 export const recordCheating = (examId, data) => api.post(`/exams/${examId}/record-cheating`, data);
 
 export const getNotifications = () => api.get('/notifications');

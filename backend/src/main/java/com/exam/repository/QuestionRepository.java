@@ -26,9 +26,14 @@ public interface QuestionRepository extends JpaRepository<Question, Long> {
     @Query("SELECT DISTINCT q.knowledgePoint FROM Question q WHERE q.subject = :subject AND q.knowledgePoint IS NOT NULL AND q.knowledgePoint <> ''")
     List<String> findKnowledgePointsBySubject(@Param("subject") String subject);
 
+    @Query("SELECT q FROM Question q WHERE q.subject = :subject AND (:difficulty IS NULL OR q.difficulty = :difficulty) AND (:knowledgePoint IS NULL OR q.knowledgePoint = :knowledgePoint)")
+    List<Question> findAllCandidates(@Param("subject") String subject,
+                                      @Param("difficulty") Integer difficulty,
+                                      @Param("knowledgePoint") String knowledgePoint);
+
     @Query("SELECT q FROM Question q WHERE q.subject = :subject AND (:difficulty IS NULL OR q.difficulty = :difficulty) AND (:knowledgePoint IS NULL OR q.knowledgePoint = :knowledgePoint) AND q.id NOT IN :excludeIds")
-    List<Question> findRandomCandidates(@Param("subject") String subject,
-                                         @Param("difficulty") Integer difficulty,
-                                         @Param("knowledgePoint") String knowledgePoint,
-                                         @Param("excludeIds") Set<Long> excludeIds);
+    List<Question> findCandidatesExcluding(@Param("subject") String subject,
+                                            @Param("difficulty") Integer difficulty,
+                                            @Param("knowledgePoint") String knowledgePoint,
+                                            @Param("excludeIds") Set<Long> excludeIds);
 }

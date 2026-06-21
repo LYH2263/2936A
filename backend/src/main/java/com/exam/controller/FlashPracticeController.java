@@ -3,9 +3,11 @@ package com.exam.controller;
 import com.exam.entity.FlashPracticeSession;
 import com.exam.entity.Question;
 import com.exam.service.FlashPracticeService;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.security.Principal;
 import java.util.List;
@@ -38,40 +40,69 @@ public class FlashPracticeController {
     }
 
     @PostMapping("/start")
-    public FlashPracticeSession startSession(@RequestBody Map<String, Object> body, Principal principal) {
+    public ResponseEntity<?> startSession(@RequestBody Map<String, Object> body, Principal principal) {
         String subject = (String) body.get("subject");
-        Integer difficulty = body.containsKey("difficulty") && body.get("difficulty") != null
-                ? Integer.valueOf(body.get("difficulty").toString())
-                : null;
+        if (subject == null || subject.trim().isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("message", "请选择科目"));
+        }
+        Integer difficulty = null;
+        if (body.containsKey("difficulty") && body.get("difficulty") != null) {
+            try {
+                difficulty = Integer.valueOf(body.get("difficulty").toString());
+            } catch (NumberFormatException ignored) {
+            }
+        }
         String knowledgePoint = (String) body.get("knowledgePoint");
-        return flashPracticeService.startSession(principal.getName(), subject, difficulty, knowledgePoint);
+        FlashPracticeSession session = flashPracticeService.startSession(
+                principal.getName(), subject, difficulty, knowledgePoint);
+        return ResponseEntity.ok(session);
     }
 
     @GetMapping("/{sessionId}/next-question")
-    public ResponseEntity<Question> getNextQuestion(@PathVariable Long sessionId) {
+    public ResponseEntity<?> getNextQuestion(@PathVariable Long sessionId, Principal principal) {
         try {
-            Question q = flashPracticeService.getNextQuestion(sessionId);
+            Question q = flashPracticeService.getNextQuestion(sessionId, principal.getName());
             return ResponseEntity.ok(q);
+        } catch (SecurityException e) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, e.getMessage());
         } catch (RuntimeException e) {
-            return ResponseEntity.notFound().build();
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("message", e.getMessage()));
         }
     }
 
     @PostMapping("/{sessionId}/submit")
-    public Map<String, Object> submitAnswer(@PathVariable Long sessionId, @RequestBody Map<String, Object> body) {
-        Long questionId = Long.valueOf(body.get("questionId").toString());
-        String answer = (String) body.get("answer");
-        return flashPracticeService.submitAnswer(sessionId, questionId, answer);
+    public ResponseEntity<?> submitAnswer(@PathVariable Long sessionId,
+                                           @RequestBody Map<String, Object> body,
+                                           Principal principal) {
+        try {
+            Long questionId = Long.valueOf(body.get("questionId").toString());
+            String answer = body.containsKey("answer") ? (String) body.get("answer") : null;
+            Map<String, Object> result = flashPracticeService.submitAnswer(sessionId, questionId, answer, principal.getName());
+            return ResponseEntity.ok(result);
+        } catch (SecurityException e) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, e.getMessage());
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        }
     }
 
     @PostMapping("/{sessionId}/end")
-    public ResponseEntity<?> endSession(@PathVariable Long sessionId) {
-        flashPracticeService.endSession(sessionId);
-        return ResponseEntity.ok().build();
+    public ResponseEntity<?> endSession(@PathVariable Long sessionId, Principal principal) {
+        try {
+            flashPracticeService.endSession(sessionId, principal.getName());
+            return ResponseEntity.ok().build();
+        } catch (SecurityException e) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, e.getMessage());
+        }
     }
 
     @GetMapping("/{sessionId}")
-    public FlashPracticeSession getSession(@PathVariable Long sessionId) {
-        return flashPracticeService.getSession(sessionId);
+    public ResponseEntity<?> getSession(@PathVariable Long sessionId, Principal principal) {
+        try {
+            FlashPracticeSession s = flashPracticeService.getSession(sessionId, principal.getName());
+            return ResponseEntity.ok(s);
+        } catch (SecurityException e) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, e.getMessage());
+        }
     }
 }

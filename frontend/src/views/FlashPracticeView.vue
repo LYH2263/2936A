@@ -109,13 +109,15 @@ const startPractice = async () => {
     return;
   }
   loading.value = true;
+  let createdSessionId = null;
   try {
     const res = await startFlashSession({
       subject: setupForm.value.subject,
       difficulty: setupForm.value.difficulty,
       knowledgePoint: setupForm.value.knowledgePoint
     });
-    sessionId.value = res.data.id;
+    createdSessionId = res.data.id;
+    sessionId.value = createdSessionId;
     sessionStats.value = {
       totalQuestions: 0,
       correctCount: 0,
@@ -124,9 +126,19 @@ const startPractice = async () => {
       accuracy: 0
     };
     phase.value = PHASE.PRACTICING;
-    await fetchNextQuestion();
+    currentQuestion.value = null;
+    showResult.value = false;
+    userAnswer.value = null;
+    multiAnswer.value = [];
+    lastResult.value = null;
+    const qRes = await getFlashNextQuestion(createdSessionId);
+    currentQuestion.value = qRes.data;
   } catch (e) {
-    message.error('开始闪练失败');
+    const errMsg = e?.response?.data?.message || e?.message || '开始闪练失败';
+    message.error(errMsg);
+    sessionId.value = null;
+    currentQuestion.value = null;
+    phase.value = PHASE.SETUP;
   } finally {
     loading.value = false;
   }
@@ -142,12 +154,11 @@ const fetchNextQuestion = async () => {
     const res = await getFlashNextQuestion(sessionId.value);
     currentQuestion.value = res.data;
   } catch (e) {
-    if (e.response?.status === 404) {
-      message.warning('暂无符合条件的题目，请调整筛选条件');
-      phase.value = PHASE.SETUP;
-    } else {
-      message.error('获取题目失败');
-    }
+    const errMsg = e?.response?.data?.message || e?.message || '获取题目失败';
+    message.warning(errMsg);
+    sessionId.value = null;
+    currentQuestion.value = null;
+    phase.value = PHASE.SETUP;
   } finally {
     loading.value = false;
   }
@@ -244,9 +255,18 @@ const streakColor = computed(() => {
   return '#52c41a';
 });
 
+const formatJudgeAnswer = (val) => {
+  if (!val) return '-';
+  const v = (val + '').trim().toUpperCase();
+  if (v === 'TRUE' || v === 'T' || v === '正确' || v === '对') return 'TRUE (正确)';
+  if (v === 'FALSE' || v === 'F' || v === '错误' || v === '错') return 'FALSE (错误)';
+  return val;
+};
+
 const formattedCorrectAnswer = computed(() => {
   if (!lastResult.value?.correctAnswer) return '-';
   const ans = lastResult.value.correctAnswer;
+  if (isJudgeType.value) return formatJudgeAnswer(ans);
   if (isMultiType.value) {
     return ans.split(/[, ]+/).filter(s => s).sort().join(', ');
   }
@@ -255,6 +275,10 @@ const formattedCorrectAnswer = computed(() => {
 
 const formattedUserAnswer = computed(() => {
   if (!lastResult.value) return '-';
+  if (isJudgeType.value) {
+    if (!userAnswer.value) return '(未作答)';
+    return formatJudgeAnswer(userAnswer.value);
+  }
   if (isMultiType.value) {
     return multiAnswer.value.length > 0 ? [...multiAnswer.value].sort().join(', ') : '(未作答)';
   }
@@ -458,18 +482,18 @@ onBeforeUnmount(() => {
               <!-- JUDGE -->
               <div v-else-if="isJudgeType" class="judge-options">
                 <div
-                  :class="['judge-btn', { selected: userAnswer === '正确', 'correct-highlight': showResult && lastResult?.correctAnswer === '正确', 'wrong-highlight': showResult && !lastResult?.correct && userAnswer === '正确' }]"
-                  @click="!showResult && (userAnswer = '正确')"
+                  :class="['judge-btn', { selected: userAnswer === 'TRUE', 'correct-highlight': showResult && lastResult?.correctAnswer === 'TRUE', 'wrong-highlight': showResult && !lastResult?.correct && userAnswer === 'TRUE' }]"
+                  @click="!showResult && (userAnswer = 'TRUE')"
                 >
                   <CheckOutlined class="judge-icon" />
-                  <span>正确</span>
+                  <span>正确 (TRUE)</span>
                 </div>
                 <div
-                  :class="['judge-btn', { selected: userAnswer === '错误', 'correct-highlight': showResult && lastResult?.correctAnswer === '错误', 'wrong-highlight': showResult && !lastResult?.correct && userAnswer === '错误' }]"
-                  @click="!showResult && (userAnswer = '错误')"
+                  :class="['judge-btn', { selected: userAnswer === 'FALSE', 'correct-highlight': showResult && lastResult?.correctAnswer === 'FALSE', 'wrong-highlight': showResult && !lastResult?.correct && userAnswer === 'FALSE' }]"
+                  @click="!showResult && (userAnswer = 'FALSE')"
                 >
                   <CloseOutlined class="judge-icon" />
-                  <span>错误</span>
+                  <span>错误 (FALSE)</span>
                 </div>
               </div>
 
