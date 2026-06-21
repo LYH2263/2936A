@@ -64,9 +64,6 @@ const fetchData = async () => {
 
 const handlePanelChange = (keys) => {
   panelActiveKeys.value = keys;
-  if (keys?.includes('announcements') && unreadCount.value > 0) {
-    handleMarkAllRead();
-  }
 };
 
 const handleItemOpen = async (item) => {

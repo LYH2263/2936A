@@ -21,8 +21,9 @@ public class ExamAnnouncementController {
 
     @GetMapping("/{examId}/announcements")
     @PreAuthorize("hasRole('TEACHER') or hasRole('ADMIN')")
-    public List<Map<String, Object>> getAnnouncementsForTeacher(@PathVariable Long examId) {
-        return announcementService.getAnnouncementsForTeacher(examId);
+    public List<Map<String, Object>> getAnnouncementsForTeacher(@PathVariable Long examId,
+                                                                 Principal principal) {
+        return announcementService.getAnnouncementsForTeacher(examId, principal.getName());
     }
 
     @PostMapping("/{examId}/announcements")

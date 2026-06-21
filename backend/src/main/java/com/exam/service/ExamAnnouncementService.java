@@ -12,6 +12,7 @@ import com.exam.repository.UserRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -39,6 +40,11 @@ public class ExamAnnouncementService {
         Exam exam = examRepository.findById(examId)
                 .orElseThrow(() -> new RuntimeException("Exam not found"));
 
+        User creator = userRepository.findByUsername(creatorUsername)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        checkExamManagePermission(exam, creator);
+
         if (!"PUBLISHED".equals(exam.getState())) {
             throw new RuntimeException("Announcements can only be created for PUBLISHED exams");
         }
@@ -47,9 +53,6 @@ public class ExamAnnouncementService {
         if (count >= MAX_ANNOUNCEMENTS) {
             throw new RuntimeException("Maximum " + MAX_ANNOUNCEMENTS + " announcements allowed per exam");
         }
-
-        User creator = userRepository.findByUsername(creatorUsername)
-                .orElseThrow(() -> new RuntimeException("User not found"));
 
         ExamAnnouncement announcement = new ExamAnnouncement();
         announcement.setExam(exam);
@@ -69,19 +72,23 @@ public class ExamAnnouncementService {
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
-        if (!announcement.getCreator().getId().equals(user.getId())
-                && !"ADMIN".equals(user.getRole())) {
-            throw new RuntimeException("No permission to edit this announcement");
-        }
+        checkExamManagePermission(announcement.getExam(), user);
 
-        if (dto.getTitle() != null) {
+        boolean hasContentChange = false;
+        if (dto.getTitle() != null && !dto.getTitle().equals(announcement.getTitle())) {
             announcement.setTitle(dto.getTitle());
+            hasContentChange = true;
         }
-        if (dto.getContent() != null) {
+        if (dto.getContent() != null && !dto.getContent().equals(announcement.getContent())) {
             announcement.setContent(dto.getContent());
+            hasContentChange = true;
         }
         if (dto.getIsPinned() != null) {
             announcement.setIsPinned(dto.getIsPinned());
+        }
+
+        if (hasContentChange) {
+            announcement.setUpdatedAt(LocalDateTime.now());
         }
 
         return announcementRepository.save(announcement);
@@ -95,10 +102,7 @@ public class ExamAnnouncementService {
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
-        if (!announcement.getCreator().getId().equals(user.getId())
-                && !"ADMIN".equals(user.getRole())) {
-            throw new RuntimeException("No permission to modify this announcement");
-        }
+        checkExamManagePermission(announcement.getExam(), user);
 
         announcement.setIsPinned(!announcement.getIsPinned());
         return announcementRepository.save(announcement);
@@ -112,15 +116,20 @@ public class ExamAnnouncementService {
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
-        if (!announcement.getCreator().getId().equals(user.getId())
-                && !"ADMIN".equals(user.getRole())) {
-            throw new RuntimeException("No permission to delete this announcement");
-        }
+        checkExamManagePermission(announcement.getExam(), user);
 
         announcementRepository.delete(announcement);
     }
 
-    public List<Map<String, Object>> getAnnouncementsForTeacher(Long examId) {
+    public List<Map<String, Object>> getAnnouncementsForTeacher(Long examId, String username) {
+        Exam exam = examRepository.findById(examId)
+                .orElseThrow(() -> new RuntimeException("Exam not found"));
+
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        checkExamManagePermission(exam, user);
+
         List<ExamAnnouncement> announcements = announcementRepository
                 .findByExamIdOrderByIsPinnedDescCreatedAtDesc(examId);
 
@@ -131,18 +140,29 @@ public class ExamAnnouncementService {
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
+        Exam exam = examRepository.findById(examId)
+                .orElseThrow(() -> new RuntimeException("Exam not found"));
+
+        checkStudentVisibility(exam, user);
+
         List<ExamAnnouncement> announcements = announcementRepository
                 .findByExamIdOrderByIsPinnedDescCreatedAtDesc(examId);
 
-        Set<Long> readAnnouncementIds = readRepository
+        Map<Long, LocalDateTime> readMap = readRepository
                 .findByAnnouncementExamIdAndUser(examId, user)
                 .stream()
-                .map(r -> r.getAnnouncement().getId())
-                .collect(Collectors.toSet());
+                .collect(Collectors.toMap(
+                        r -> r.getAnnouncement().getId(),
+                        ExamAnnouncementRead::getReadAt
+                ));
 
         return announcements.stream().map(a -> {
             Map<String, Object> map = toStudentMap(a);
-            map.put("isRead", readAnnouncementIds.contains(a.getId()));
+            LocalDateTime readAt = readMap.get(a.getId());
+            boolean isRead = readAt != null
+                    && a.getUpdatedAt() != null
+                    && !readAt.isBefore(a.getUpdatedAt());
+            map.put("isRead", isRead);
             return map;
         }).collect(Collectors.toList());
     }
@@ -151,17 +171,29 @@ public class ExamAnnouncementService {
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
+        Exam exam = examRepository.findById(examId)
+                .orElseThrow(() -> new RuntimeException("Exam not found"));
+
+        checkStudentVisibility(exam, user);
+
         List<ExamAnnouncement> announcements = announcementRepository
                 .findByExamIdOrderByIsPinnedDescCreatedAtDesc(examId);
 
-        Set<Long> readIds = readRepository
+        Map<Long, LocalDateTime> readMap = readRepository
                 .findByAnnouncementExamIdAndUser(examId, user)
                 .stream()
-                .map(r -> r.getAnnouncement().getId())
-                .collect(Collectors.toSet());
+                .collect(Collectors.toMap(
+                        r -> r.getAnnouncement().getId(),
+                        ExamAnnouncementRead::getReadAt
+                ));
 
         return announcements.stream()
-                .filter(a -> !readIds.contains(a.getId()))
+                .filter(a -> {
+                    LocalDateTime readAt = readMap.get(a.getId());
+                    return readAt == null
+                            || a.getUpdatedAt() == null
+                            || readAt.isBefore(a.getUpdatedAt());
+                })
                 .count();
     }
 
@@ -173,14 +205,24 @@ public class ExamAnnouncementService {
         ExamAnnouncement announcement = announcementRepository.findById(announcementId)
                 .orElseThrow(() -> new RuntimeException("Announcement not found"));
 
-        if (readRepository.existsByAnnouncementIdAndUser(announcementId, user)) {
-            return;
-        }
+        checkStudentVisibility(announcement.getExam(), user);
 
-        ExamAnnouncementRead read = new ExamAnnouncementRead();
-        read.setAnnouncement(announcement);
-        read.setUser(user);
-        readRepository.save(read);
+        Optional<ExamAnnouncementRead> existingRead = readRepository
+                .findByAnnouncementExamIdAndUser(announcement.getExam().getId(), user)
+                .stream()
+                .filter(r -> r.getAnnouncement().getId().equals(announcementId))
+                .findFirst();
+
+        if (existingRead.isPresent()) {
+            ExamAnnouncementRead read = existingRead.get();
+            read.setReadAt(LocalDateTime.now());
+            readRepository.save(read);
+        } else {
+            ExamAnnouncementRead read = new ExamAnnouncementRead();
+            read.setAnnouncement(announcement);
+            read.setUser(user);
+            readRepository.save(read);
+        }
     }
 
     @Transactional
@@ -188,23 +230,73 @@ public class ExamAnnouncementService {
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
+        Exam exam = examRepository.findById(examId)
+                .orElseThrow(() -> new RuntimeException("Exam not found"));
+
+        checkStudentVisibility(exam, user);
+
         List<ExamAnnouncement> announcements = announcementRepository
                 .findByExamIdOrderByIsPinnedDescCreatedAtDesc(examId);
 
-        Set<Long> readIds = readRepository
+        Map<Long, ExamAnnouncementRead> readMap = readRepository
                 .findByAnnouncementExamIdAndUser(examId, user)
                 .stream()
-                .map(r -> r.getAnnouncement().getId())
-                .collect(Collectors.toSet());
+                .collect(Collectors.toMap(
+                        r -> r.getAnnouncement().getId(),
+                        r -> r
+                ));
 
+        LocalDateTime now = LocalDateTime.now();
         for (ExamAnnouncement a : announcements) {
-            if (!readIds.contains(a.getId())) {
+            ExamAnnouncementRead existing = readMap.get(a.getId());
+            if (existing != null) {
+                existing.setReadAt(now);
+                readRepository.save(existing);
+            } else {
                 ExamAnnouncementRead read = new ExamAnnouncementRead();
                 read.setAnnouncement(a);
                 read.setUser(user);
                 readRepository.save(read);
             }
         }
+    }
+
+    private void checkExamManagePermission(Exam exam, User user) {
+        if ("ADMIN".equals(user.getRole())) {
+            return;
+        }
+        if (exam.getCreator() != null && exam.getCreator().getId().equals(user.getId())) {
+            return;
+        }
+        throw new RuntimeException("No permission to manage announcements for this exam");
+    }
+
+    private void checkStudentVisibility(Exam exam, User user) {
+        if ("ADMIN".equals(user.getRole()) || "TEACHER".equals(user.getRole())) {
+            return;
+        }
+        if (!"PUBLISHED".equals(exam.getState())) {
+            throw new RuntimeException("Exam is not visible");
+        }
+        if ("ALL".equals(exam.getTargetAudience()) || exam.getTargetAudience() == null) {
+            return;
+        }
+        if ("CUSTOM".equals(exam.getTargetAudience()) && exam.getTargetIds() != null) {
+            String[] ids = exam.getTargetIds().split(",");
+            for (String id : ids) {
+                String trimmed = id.trim();
+                if (trimmed.equals(user.getUsername())) {
+                    return;
+                }
+                try {
+                    Long numericId = Long.parseLong(trimmed);
+                    if (numericId.equals(user.getId())) {
+                        return;
+                    }
+                } catch (NumberFormatException ignored) {}
+            }
+        }
+        throw new RuntimeException("Exam is not visible to you");
     }
 
     private Map<String, Object> toBaseMap(ExamAnnouncement a) {
